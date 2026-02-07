@@ -97,7 +97,7 @@ export default function Tournament() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {tournaments.map((tournament, index) => (
               <motion.div
-                key={tournament.id}
+                key={index}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.2 }}

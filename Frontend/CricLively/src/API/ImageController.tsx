@@ -3,7 +3,14 @@ export default async function ImageController(playerId: string): Promise<string 
   try {
     if (!playerId) return null;
 
-    const playerRes = await fetch(`http://localhost:8080/player/${playerId}`);
+    const playerRes = await fetch(`http://localhost:8080/player/${playerId}`, {
+      method: "GET",
+      // IMPORTANT: This must be present in EVERY request to protected routes
+      credentials: "include", 
+      headers: {
+        "Accept": "application/json",
+      },
+    });
     if (!playerRes.ok) return null;
 
     const player = await playerRes.json();

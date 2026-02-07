@@ -42,6 +42,7 @@ export default function Login() {
         }, 3000);
       }
     } catch (error: any) {
+      console.log(error)
       toast({
         title: "Login Failed!!",
         variant: "destructive",

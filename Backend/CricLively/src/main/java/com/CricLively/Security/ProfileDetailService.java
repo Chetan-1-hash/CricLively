@@ -10,8 +10,10 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+
 @Service
-public class UserDetailService implements UserDetailsService {
+public class ProfileDetailService implements UserDetailsService {
 
     @Autowired
     private ProfileRepository profileRepository;
@@ -19,8 +21,8 @@ public class UserDetailService implements UserDetailsService {
     @Override
     public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
         Profile profile = this.profileRepository.findByEmail(username).orElseThrow(
-                () -> new UsernameNotFoundException("User details not found")
+                () -> new UsernameNotFoundException("Email details not found")
         );
-        return new User(profile.getEmail(), profile.getPassword(),null);
+        return new User(profile.getEmail(), profile.getPassword(),new ArrayList<>());
     }
 }
