@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import Navbar from "./Navbar";
 import { useNavigate } from "react-router-dom";
 import { TournamentResponse } from "./data/TournamentEntity";
-import TournamentAPI from "../API/TournamentAPI";
+import TournamentAPI from "../API/TournamentDashboardAPI";
 import { toast } from "../hooks/use-toast";
 
 
-export default function Tournament() {
+export default function TournamentDashboard() {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
@@ -36,17 +35,14 @@ export default function Tournament() {
   const handleActionClick = (action: string) => {
     setDropdownOpen(false);
     if (action === "New Tournament") {
-      // Navigate to create tournament page
-      navigate("/tournament/new");
+      navigate("/showTournaments/createTournament");
     } else if (action === "New Match") {
-      // Navigate to create match page
-      navigate("/match/new");
+      navigate("/matchesDashboard/createMatch");
     }
   };
 
   return (
     <>
-      <Navbar />
       <section className="min-h-[100vh] relative py-12 bg-background/80">
         <div className="container my-18 mx-auto px-6 relative">
           {/* Header with + button */}
@@ -97,7 +93,7 @@ export default function Tournament() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {tournaments.map((tournament, index) => (
               <motion.div
-                key={index}
+                key={tournament.id}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.2 }}
@@ -119,15 +115,16 @@ export default function Tournament() {
                 <p className="text-sm text-foreground/70 mb-1">
                   {tournament.startDate} – {tournament.endDate}
                 </p>
-                <p className="text-sm text-foreground/70">
+                {/* <p className="text-sm text-foreground/70">
                   {tournament.teamIds.length} Teams
-                </p>
+                </p> */}
 
                 {/* Enter button */}
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="mt-4 w-full py-2.5 bg-accent text-accent-foreground rounded-full font-semibold text-sm shadow-md hover:shadow-lg transition-shadow"
+                  onClick={() => navigate(`/matchesDashboard/${tournament.id}`)}
                 >
                   View Tournament
                 </motion.button>
@@ -136,6 +133,8 @@ export default function Tournament() {
           </div>
         </div>
       </section>
+      
+
     </>
   );
 }

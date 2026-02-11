@@ -3,6 +3,7 @@ package com.CricLively.Entities;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
 
 import java.util.List;
 
@@ -11,6 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 public class Innings {
 
+    @Id
+    private String inningsId;
     private Integer inningsNumber; // 1 or 2
     private String battingTeamId;
     private String bowlingTeamId;

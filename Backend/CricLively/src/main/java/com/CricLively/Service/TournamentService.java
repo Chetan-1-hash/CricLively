@@ -1,10 +1,13 @@
 package com.CricLively.Service;
 
+import com.CricLively.DTO.AddTournamentRequest;
 import com.CricLively.DTO.TournamentDashboardResponse;
+import com.CricLively.Entities.Enums.TournamentStatus;
 import com.CricLively.Entities.Tournament;
 import com.CricLively.Repository.TournamentRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,18 +29,36 @@ public class TournamentService {
 
     private TournamentDashboardResponse mapToDashboardResponse(Tournament tournament) {
         TournamentDashboardResponse dto = new TournamentDashboardResponse();
+        dto.setId(tournament.getId());
         dto.setName(tournament.getName());
         dto.setCoverImage(tournament.getCoverImage());
         dto.setStartDate(tournament.getStartDate());
         dto.setEndDate(tournament.getEndDate());
-        dto.setTeamIds(tournament.getTeamIds());
+//        dto.setTeamIds(tournament.getTeamIds());
         dto.setTournamentStatus(tournament.getTournamentStatus());
 
         return dto;
     }
 
-    public Tournament createTournament(Tournament tournament){
-        return tournamentRepository.save(tournament);
+
+    public void createTournament(AddTournamentRequest addTournament){
+        Tournament tournament = new Tournament();
+        tournament.setName(addTournament.getName());
+        tournament.setCoverImage(addTournament.getCoverImage().toString());
+        tournament.setOrganizerIds(addTournament.getOrganizerIds());
+        tournament.setFormat(addTournament.getFormat());
+        tournament.setStartDate(addTournament.getStartDate());
+        tournament.setEndDate(addTournament.getEndDate());
+        LocalDate today = LocalDate.now();
+
+        TournamentStatus status =today.isBefore(addTournament.getStartDate())
+                        ? TournamentStatus.UPCOMING
+                        : TournamentStatus.LIVE;
+
+        tournament.setTournamentStatus(status);
+        tournamentRepository.save(tournament);
     }
+
+
 
 }

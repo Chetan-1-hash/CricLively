@@ -10,11 +10,15 @@ export default function Login() {
   const [email, setEmail]=useState("");
   const [password, setPassword]=useState("");
   const navigate = useNavigate(); // hook for navigation
+  type UserRole = "PLAYER" | "ORGANIZER" | "ADMIN";
+
+  const [role, setRole] = useState<UserRole>("PLAYER");
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const payload: LoginRequest = {email, password};
+    const payload: LoginRequest = {email, password, role};
 
     try {
       const response = await login(payload);
@@ -28,7 +32,7 @@ export default function Login() {
         // Simulate login success
         localStorage.setItem("token", "user_token_example");
         setTimeout(() => {
-          navigate("/tournament");
+          navigate("/showtournaments");
         }, 3000);
       } else {
         toast({
@@ -55,7 +59,7 @@ export default function Login() {
   return (
     <>
       <Navbar />
-      <section className="min-h-[100vh] relative flex items-center justify-center overflow-hidden py-12">
+      <section className="min-h-[100vh] relative flex items-center justify-center overflow-hidden py-22">
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-secondary/20" />
 
@@ -93,6 +97,41 @@ export default function Login() {
 
           {/* Form */}
           <form className="space-y-4">
+            {/* Role Slider */}
+<div className="flex justify-center mb-2">
+  <div className="relative flex bg-background/70 border border-border rounded-full p-1 w-full max-w-xs">
+    {(["PLAYER", "ORGANIZER", "ADMIN"] as UserRole[]).map((r) => (
+      <button
+        key={r}
+        type="button"
+        onClick={() => setRole(r)}
+        className={`flex-1 z-10 text-xs font-semibold py-2 rounded-full transition-colors ${
+          role === r
+            ? "text-primary-foreground"
+            : "text-foreground/70"
+        }`}
+      >
+        {r}
+      </button>
+    ))}
+
+    {/* Sliding indicator */}
+    <motion.div
+      layout
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      className="absolute top-1 bottom-1 w-1/3 bg-primary rounded-full"
+      style={{
+        left:
+          role === "PLAYER"
+            ? "0%"
+            : role === "ORGANIZER"
+            ? "33.33%"
+            : "66.66%",
+      }}
+    />
+  </div>
+</div>
+
             {/* Email */}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1.5">

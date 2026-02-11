@@ -1,18 +1,15 @@
 package com.CricLively.Service;
 
 import com.CricLively.DTO.PlayerCricketDetailsRequest;
-import com.CricLively.DTO.PlayerRegisterRequest;
-import com.CricLively.Entities.Enums.Role;
+import com.CricLively.DTO.ProfileList;
 import com.CricLively.Entities.Player;
-import com.CricLively.Entities.Profile;
-import com.CricLively.Exceptions.RegistrationException;
 import com.CricLively.Exceptions.UpdateCricketDetailsException;
 import com.CricLively.Repository.PlayerRepository;
-import com.CricLively.Repository.ProfileRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Service
 public class PlayerService {
@@ -55,5 +52,19 @@ public class PlayerService {
     public Player updateStats(Player player) {
         return playerRepository.save(player);
     }
+
+    @Transactional
+    public void addBulkPlayers(List<Player> players) {
+
+        for (Player player : players) {
+
+            if (player.isCricketDetailsCompleted()) {
+                player.setCricketDetailsCompleted(true);
+            }
+
+            playerRepository.save(player);
+        }
+    }
+
 
 }

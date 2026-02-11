@@ -41,3 +41,48 @@ export class PlayerCricketDetailsRequest {
     Object.assign(this, init);
   }
 }
+
+export class ProfileList{
+  id! : string; 
+  mobileNumber! : string;
+  firstName! : string;
+  middleName? : string;
+  lastName! : string;
+  role! : string;
+
+  constructor(init?: Partial<ProfileList>) {
+    Object.assign(this, init);
+  }
+}
+
+export class TeamsList{
+  id! : string;
+  name! : string;
+
+  constructor(init?: Partial<TeamsList>) {
+    Object.assign(this, init);
+  }
+}
+
+export class TournamentList{
+  id! : string;
+  name! : string;
+
+  constructor(init?: Partial<TournamentList>) {
+    Object.assign(this, init);
+  }
+}
+
+export class AddTournamentRequest{
+  name! : string;
+  coverImage! : File;
+  organizerIds! : string[];
+  format! : string;
+  startDate! : string;
+  endDate! : string;
+  venue!: string;
+  
+  constructor(init?: Partial<AddTournamentRequest>) {
+    Object.assign(this, init);
+  }
+}

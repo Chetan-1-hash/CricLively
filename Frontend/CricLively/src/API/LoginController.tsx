@@ -9,8 +9,8 @@ export async function login(request : LoginRequest): Promise<any>{
     });
 
     if(!response.ok){
-        const text = await response.text();
-        throw new Error(text || "Login Failed!");
+        const text = await response.json();
+        throw new Error(text.message || "Login Failed!");
     }
 
     return await response.json();

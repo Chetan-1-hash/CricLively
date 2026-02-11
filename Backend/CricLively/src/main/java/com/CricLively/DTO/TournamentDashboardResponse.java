@@ -8,10 +8,11 @@ import java.util.List;
 
 @Data
 public class TournamentDashboardResponse {
+    private String id;
     private String name;
     private String coverImage;
     private LocalDate startDate;
     private LocalDate endDate;
+    private String venue;
     private TournamentStatus tournamentStatus;
-    private List<String> teamIds;
 }

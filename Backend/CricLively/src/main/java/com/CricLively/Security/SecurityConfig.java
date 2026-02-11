@@ -4,7 +4,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +23,7 @@ import java.util.List;
 
 @Configuration
 @AllArgsConstructor
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final ProfileDetailService userDetailService;
@@ -31,18 +34,21 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((requests) ->requests
-                                .requestMatchers("/", "/profile/login", "/profile/register").permitAll()
+                                .requestMatchers("/", "/profile/login", "/player/register", "/player/register/bulk", "/player/bulk/playerInfo").permitAll()
                                 .requestMatchers("/images/**").authenticated()
                                 .requestMatchers("/player/**").authenticated()
-//                                .requestMatchers("/profile/**").authenticated()
-                                .requestMatchers("/match").authenticated()
+                                .requestMatchers("/profile/**").authenticated()
+                                .requestMatchers("/match/**").authenticated()
+                                .requestMatchers("/team/**").authenticated()
                                 .requestMatchers("/tournaments/**","/addTournament").authenticated()
+                                .anyRequest().authenticated()
                         )
 
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
                 .httpBasic(AbstractHttpConfigurer::disable)
+//                .httpBasic(Customizer.withDefaults())
                 .userDetailsService(userDetailService)
                 .build();
     };
@@ -57,7 +63,7 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(Collections.singletonList("http://localhost:5173"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(Collections.singletonList("*"));
+        config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

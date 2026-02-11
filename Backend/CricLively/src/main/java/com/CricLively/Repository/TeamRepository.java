@@ -1,7 +1,17 @@
 package com.CricLively.Repository;
 
+import com.CricLively.DTO.TeamsList;
 import com.CricLively.Entities.Team;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
+@Repository
 public interface TeamRepository extends MongoRepository<Team, String> {
+
+    String findTeamNameById(String id);
+
+    List<TeamsList> findAllBy();
+
 }

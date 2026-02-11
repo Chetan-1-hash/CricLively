@@ -6,8 +6,11 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.FieldType;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Data
 @RequiredArgsConstructor
@@ -19,9 +22,9 @@ public class Profile {
     @Indexed(unique = true)
     private String email;
     @Indexed(unique = true)
-    private String mobileNo;
+    private String mobileNumber;
     private String password;
-    private Role role;// Enumeration
+    private Set<Role> role;// Enumeration
     private String playerId; // Null if user is just an admin
     @CreatedDate
     private LocalDateTime registrationDate;

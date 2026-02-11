@@ -1,7 +1,7 @@
 import type { TournamentResponse } from "../components/data/TournamentEntity";
 
 export default async function TournamentAPI(): Promise<TournamentResponse[]> {
-  const resp = await fetch("http://localhost:8080/tournaments/",{
+  const resp = await fetch("http://localhost:8080/tournaments",{
     method:"GET",
     credentials:"include",
     headers: {

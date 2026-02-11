@@ -27,7 +27,7 @@ export interface PointsTableEntry {
 }
 
 export class TournamentResponse {
-  id?: string;
+  id!: string;
   name!: string;
   coverImage!: string;
   startDate!: string;

@@ -10,8 +10,8 @@ const authNavItems = [
 ];
 
 const appNavItems = [
-  { name: "Matches", to: "/match" },
-  { name: "Tournament", to: "/tournament" },
+  { name: "Matches", to: "/matches" },
+  { name: "Tournament", to: "/showtournaments" },
   { name: "Stats", to: "/stats" },
 ];
 

@@ -6,14 +6,14 @@ import com.CricLively.DTO.PlayerRegisterResponse;
 import com.CricLively.Entities.Player;
 import com.CricLively.Exceptions.RegistrationException;
 import com.CricLively.Exceptions.UpdateCricketDetailsException;
-import com.CricLively.Service.ImageStorageService;
 import com.CricLively.Service.PlayerService;
 import com.CricLively.Service.ProfileService;
-import org.bson.types.ObjectId;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/player")
@@ -72,7 +72,7 @@ public class PlayerController {
             );
         } catch (UpdateCricketDetailsException e) {
             return ResponseEntity
-                    .status(HttpStatus.BAD_REQUEST)
+                    .status(HttpStatus. BAD_REQUEST)
                     .body(new PlayerRegisterResponse(
                             null,
                             null,
@@ -80,5 +80,38 @@ public class PlayerController {
                     ));
         }
     }
+
+
+    @PostMapping("/register/bulk")
+    public ResponseEntity<List<PlayerRegisterResponse>> registerBulkPlayers(
+            @RequestBody List<PlayerRegisterRequest> players) {
+
+        try {
+            List<Player> savedPlayers = profileService.registerBulk(players);
+
+            List<PlayerRegisterResponse> response = savedPlayers.stream()
+                    .map(p -> new PlayerRegisterResponse(
+                            p.getId(),
+                            p.getFirstName(),
+                            "Registered successfully"
+                    ))
+                    .toList();
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        } catch (RegistrationException e) {
+            System.out.print(e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/bulk/playerInfo")
+    public ResponseEntity<String> addBulkPlayers(@RequestBody List<Player> players) {
+        playerService.addBulkPlayers(players);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body("Bulk players added successfully");
+    }
+
+
 
 }
