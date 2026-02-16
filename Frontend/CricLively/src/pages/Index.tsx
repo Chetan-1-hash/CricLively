@@ -1,6 +1,5 @@
 import Navbar from '../components/Navbar';
 import HeroSection from '../components/HeroSection';
-import StatsSection from '../components/StatsSection';
 import Footer from '../components/Footer';
 
 const Index = () => {
@@ -8,8 +7,6 @@ const Index = () => {
     <div className="min-h-screen bg-background overflow-x-hidden">
       <Navbar />
       <HeroSection />
-      {/* <MatchesSection /> */}
-      <StatsSection />
       <Footer />
     </div>
   );

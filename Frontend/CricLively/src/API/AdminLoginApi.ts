@@ -1,7 +1,8 @@
-import type { LoginRequest } from "../components/data/LoginRequest";
+import type { LoginRequest } from "../components/data/DTO";
 
-export async function login(request : LoginRequest): Promise<any>{
-    const response = await fetch("http://localhost:8080/profile/login", {
+
+export async function adminLogin(request : LoginRequest): Promise<any>{
+    const response = await fetch("http://localhost:8080/admin/login", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(request),

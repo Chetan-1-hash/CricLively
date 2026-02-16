@@ -34,13 +34,18 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests((requests) ->requests
-                                .requestMatchers("/", "/profile/login", "/player/register", "/player/register/bulk", "/player/bulk/playerInfo").permitAll()
+                                .requestMatchers("/", "/profile/login", "/player/register",
+                                        "/player/register/bulk", "/player/bulk/playerInfo",
+                                        "/organizer/login", "/admin/login", "/images/**").permitAll()
                                 .requestMatchers("/images/**").authenticated()
                                 .requestMatchers("/player/**").authenticated()
+                                .requestMatchers("/organizer/**").authenticated()
+                                .requestMatchers("/admin/**").authenticated()
                                 .requestMatchers("/profile/**").authenticated()
                                 .requestMatchers("/match/**").authenticated()
                                 .requestMatchers("/team/**").authenticated()
                                 .requestMatchers("/tournaments/**","/addTournament").authenticated()
+                                .requestMatchers("/gallery/**").authenticated()
                                 .anyRequest().authenticated()
                         )
 

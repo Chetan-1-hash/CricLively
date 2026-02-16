@@ -1,52 +1,82 @@
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useNavigate } from "react-router-dom";
-import { LoginRequest } from "./data/LoginRequest";
-import { login } from "../API/LoginController";
+import { LoginRequest } from "./data/DTO";
+import { playerLogin } from "../API/PlayerLoginApi";
 import { toast } from "../hooks/use-toast";
 import { useState } from "react";
+import { organizerLogin } from "../API/OrganizerLoginApi";
+import { adminLogin } from "../API/AdminLoginApi";
 
 export default function Login() {
-  const [email, setEmail]=useState("");
-  const [password, setPassword]=useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const navigate = useNavigate(); // hook for navigation
   type UserRole = "PLAYER" | "ORGANIZER" | "ADMIN";
 
   const [role, setRole] = useState<UserRole>("PLAYER");
 
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const payload: LoginRequest = {email, password, role};
+    const payload: LoginRequest = { email, password, role };
 
     try {
-      const response = await login(payload);
-      sessionStorage.setItem("playerId", response.playerId);
-      if (response.isCricketDetailsCompleted) {
-        toast({
-          title: `Welcome to CricLively, ${response.firstName}`,
-          description: response.message,
-          duration: 3000,
-        });
-        // Simulate login success
-        localStorage.setItem("token", "user_token_example");
-        setTimeout(() => {
-          navigate("/showtournaments");
-        }, 3000);
-      } else {
+      if (role === "PLAYER") {
+        const response = await playerLogin(payload);
+
+        sessionStorage.setItem("playerId", response.playerId);
+
         toast({
           title: `Welcome ${response.firstName},`,
           description: response.message,
           duration: 3000,
         });
 
+        localStorage.setItem("token", response.token);
+
         setTimeout(() => {
-          navigate(`/player/${response.playerId}`);
+          if (response.isCricketDetailsCompleted) {
+            navigate("/showtournaments");
+          } else {
+            navigate(`/player/${response.playerId}`);
+          }
+        }, 3000);
+      } else if (role === "ORGANIZER") {
+        const response = await organizerLogin(payload);
+
+        sessionStorage.setItem("playerId", response.playerId);
+
+        toast({
+          title: `Welcome ${response.firstName},`,
+          description: response.message,
+          duration: 3000,
+        });
+
+        localStorage.setItem("token", response.token);
+
+        setTimeout(() => {
+          navigate("/showtournaments");
+        }, 3000);
+      } else if (role === "ADMIN") {
+        const response = await adminLogin(payload);
+
+        sessionStorage.setItem("playerId", response.playerId);
+
+        toast({
+          title: `Welcome ${response.firstName},`,
+          description: response.message,
+          duration: 3000,
+        });
+
+        localStorage.setItem("token", response.token);
+
+        setTimeout(() => {
+          navigate("/showtournaments");
         }, 3000);
       }
     } catch (error: any) {
-      console.log(error)
+      console.log(error);
       toast({
         title: "Login Failed!!",
         variant: "destructive",
@@ -55,7 +85,6 @@ export default function Login() {
       });
     }
   };
-
   return (
     <>
       <Navbar />
@@ -98,39 +127,39 @@ export default function Login() {
           {/* Form */}
           <form className="space-y-4">
             {/* Role Slider */}
-<div className="flex justify-center mb-2">
-  <div className="relative flex bg-background/70 border border-border rounded-full p-1 w-full max-w-xs">
-    {(["PLAYER", "ORGANIZER", "ADMIN"] as UserRole[]).map((r) => (
-      <button
-        key={r}
-        type="button"
-        onClick={() => setRole(r)}
-        className={`flex-1 z-10 text-xs font-semibold py-2 rounded-full transition-colors ${
-          role === r
-            ? "text-primary-foreground"
-            : "text-foreground/70"
-        }`}
-      >
-        {r}
-      </button>
-    ))}
+            <div className="flex justify-center mb-2">
+              <div className="relative flex bg-background/70 border border-border rounded-full p-1 w-full max-w-xs">
+                {(["PLAYER", "ORGANIZER", "ADMIN"] as UserRole[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRole(r)}
+                    className={`flex-1 z-10 text-xs font-semibold py-2 rounded-full transition-colors ${
+                      role === r
+                        ? "text-primary-foreground"
+                        : "text-foreground/70"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
 
-    {/* Sliding indicator */}
-    <motion.div
-      layout
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
-      className="absolute top-1 bottom-1 w-1/3 bg-primary rounded-full"
-      style={{
-        left:
-          role === "PLAYER"
-            ? "0%"
-            : role === "ORGANIZER"
-            ? "33.33%"
-            : "66.66%",
-      }}
-    />
-  </div>
-</div>
+                {/* Sliding indicator */}
+                <motion.div
+                  layout
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  className="absolute top-1 bottom-1 w-1/3 bg-primary rounded-full"
+                  style={{
+                    left:
+                      role === "PLAYER"
+                        ? "0%"
+                        : role === "ORGANIZER"
+                        ? "33.33%"
+                        : "66.66%",
+                  }}
+                />
+              </div>
+            </div>
 
             {/* Email */}
             <div>
@@ -141,7 +170,7 @@ export default function Login() {
                 type="email"
                 placeholder="you@cricket.com"
                 value={email}
-                onChange = {(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
@@ -154,8 +183,8 @@ export default function Login() {
               <input
                 type="password"
                 placeholder="••••••••"
-                value = {password}
-                onChange = {(e) => setPassword(e.target.value)}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>

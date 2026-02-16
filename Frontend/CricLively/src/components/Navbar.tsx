@@ -13,6 +13,7 @@ const appNavItems = [
   { name: "Matches", to: "/matches" },
   { name: "Tournament", to: "/showtournaments" },
   { name: "Stats", to: "/stats" },
+  { name: "Gallery", to: "/gallery" },
 ];
 
 export default function Navbar() {
