@@ -96,3 +96,9 @@ export class AddTournamentRequest{
     Object.assign(this, init);
   }
 }
+
+export class Gallery{
+  imageId! : string;
+  fileName! : string;
+  year! : number;
+}
