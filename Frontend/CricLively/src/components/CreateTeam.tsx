@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
-import type { ProfileList } from "./data/DTO";
-import { ProfileListAPI } from "../API/ProfileListAPI";
-import { TeamsListAPI } from "../API/TeamsAPI";
+import type { ProfileList, Team } from "./data/DTO";
+import { ProfileListAPI } from "../API/ProfileAPI";
+import { addTeamAPI, TeamsListAPI } from "../API/TeamsAPI";
+import TournamentAPI from "../API/TournamentAPI";
+import { toast } from "../hooks/use-toast";
+import { useLocation } from "react-router-dom";
 
 type Tournament = {
   id: string;
@@ -13,25 +16,38 @@ type Tournament = {
 export default function CreateTeam() {
   /* ---------------- TEAM NAME & CAPTAIN ---------------- */
   const [teamName, setTeamName] = useState("");
-  const [captainName, setCaptainName] = useState(""); // New field
+  const [captainQuery, setCaptainQuery] = useState("");
+  const [selectedCaptainId, setSelectedCaptainId] = useState<string | null>(
+    null
+  );
+  const [hasSearchedCaptain, setHasSearchedCaptain] = useState(false);
   const [nameChecked, setNameChecked] = useState(false);
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
 
   /* ---------------- TOURNAMENT ---------------- */
   const [tournamentQuery, setTournamentQuery] = useState("");
-  const [tournamentResults, setTournamentResults] = useState<Tournament[]>([]);
+  const [allTournament, setAllTournament] = useState<Tournament[]>([]);
   const [selectedTournament, setSelectedTournament] =
     useState<Tournament | null>(null);
+  const [hasSearchedTournament, setHasSearchedTournament] = useState(false);
 
   /* ---------------- PLAYERS ---------------- */
   const [playerQuery, setPlayerQuery] = useState("");
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]); // store only IDs
   const [allPlayers, setAllPlayers] = useState<ProfileList[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [occupiedPlayerIds, setOccupiedPlayerIds] = useState<string[]>([]);
 
   /* ---------------- LOGO ---------------- */
   const [logo, setLogo] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
+
+  const location = useLocation();
+  const tournamentId = location.state?.tournamentId;
+
+  useEffect(() => {
+    tournamentList();
+  }, [tournamentId]);
 
   /* ======================================================
      TEAM NAME CHECK
@@ -39,12 +55,21 @@ export default function CreateTeam() {
   const checkTeamName = async () => {
     setNameChecked(false);
     setNameAvailable(null);
-
     try {
+      console.log("IN");    
       const teams = await TeamsListAPI();
+      if (!teamName?.trim()) {
+        setNameAvailable(false);
+        setNameChecked(true);
+        return;
+      }
       const exists = teams.some(
-        (t) => t.name.toLowerCase() === teamName.trim().toLowerCase()
+        (t) =>
+          typeof t.teamName === "string" && 
+          String(t.tournamentId) === tournamentId &&
+          t.teamName.trim().toLowerCase() === teamName.trim().toLowerCase()
       );
+
       setNameAvailable(!exists);
     } catch {
       setNameAvailable(false);
@@ -53,25 +78,116 @@ export default function CreateTeam() {
     }
   };
 
-  /* ======================================================
-     PLAYER SEARCH
-  ====================================================== */
-  const searchPlayers = async () => {
-    if (!playerQuery.trim()) return;
+  const searchCaptain = async () => {
+    if (!captainQuery.trim()) return;
 
-    setHasSearched(true);
+    setHasSearchedCaptain(true);
 
     if (allPlayers.length === 0) {
       try {
         const data = await ProfileListAPI();
         const playersWithId = data.map((p, idx) => ({
           ...p,
-          id: p.id || p.mobileNumber|| idx.toString(),
+          id: p.id || p.mobileNumber || idx.toString(),
         }));
         setAllPlayers(playersWithId);
       } catch (err) {
         console.error("Failed to fetch players:", err);
       }
+    }
+  };
+
+  const filteredCaptain =
+  hasSearchedCaptain && captainQuery.trim()
+    ? allPlayers.filter(
+        (p) =>
+          `${p.firstName} ${p.middleName ?? ""} ${p.lastName}`
+            .toLowerCase()
+            .includes(captainQuery.toLowerCase()) &&
+          !occupiedPlayerIds.includes(p.id) &&
+          !selectedPlayerIds.includes(p.id)
+      )
+    : [];
+
+  const selectCaptain = (p: ProfileList) => {
+    if (!p.id) return;
+    setSelectedCaptainId(p.id);
+    setCaptainQuery(`${p.firstName} ${p.lastName}`);
+    setHasSearchedCaptain(false);
+  };
+
+  /* ======================================================
+     TOURNAMENT SEARCH
+  ====================================================== */
+
+  const tournamentList = async () => {
+    if(tournamentId==null){
+      try {
+        const data = await TournamentAPI();
+        setAllTournament(data);
+        setHasSearchedTournament(true);
+      } catch (err) {
+        console.error("Failed to fetch tournaments:", err);
+      }
+    }
+    else{
+      try{
+        const data = await TournamentAPI();
+        data.forEach((item) => {
+          if (tournamentId === item.id) {
+            setHasSearchedTournament(true);
+            setSelectedTournament(item);
+          }
+        });
+        
+      }
+      catch (err){
+        console.error("Failed to get tournament name", err);
+      }
+    }
+    
+  };
+
+  const filteredTournamentList =
+    hasSearchedTournament && tournamentQuery.trim()
+      ? allTournament.filter((t) =>
+          t.name.toLowerCase().includes(tournamentQuery.toLowerCase())
+        )
+      : [];
+
+  /* ======================================================
+     PLAYER SEARCH
+  ====================================================== */
+  const searchPlayers = async () => {
+    if (!playerQuery.trim()) {
+      console.log("Player query empty");
+      return;
+    }
+
+    setHasSearched(true);
+
+    try {
+      const [playersData, teamsData] = await Promise.all([
+        ProfileListAPI(),
+        TeamsListAPI(),
+      ]);
+
+      const playersWithId = playersData.map((p, idx) => ({
+        ...p,
+        id: p.id || p.mobileNumber || idx.toString(),
+      }));
+
+      setAllPlayers(playersWithId);
+
+      const currentTournamentId = selectedTournament?.id || tournamentId;
+
+      const occupiedIds = teamsData
+        .filter((team) => team.tournamentId === currentTournamentId)
+        .flatMap((team) => team.squadPlayerIds || []);
+
+      setOccupiedPlayerIds(occupiedIds);
+    } catch (err) {
+      console.error("Failed to fetch players:", err);
     }
   };
 
@@ -82,7 +198,8 @@ export default function CreateTeam() {
             `${p.firstName} ${p.middleName ?? ""} ${p.lastName}`
               .toLowerCase()
               .includes(playerQuery.toLowerCase()) &&
-            !selectedPlayerIds.includes(p.id)
+            !selectedPlayerIds.includes(p.id) && 
+            !occupiedPlayerIds.includes(p.id)
         )
       : [];
 
@@ -94,18 +211,35 @@ export default function CreateTeam() {
   };
 
   const submitTeam = async () => {
-    if (!nameAvailable || !selectedTournament) return;
+    if (!nameAvailable || !selectedTournament || !selectedCaptainId || !logo) {
 
-    const payload = {
-      teamName,
-      captainName, // send captain
+      toast({
+        title: "Failed to create team",
+        description: "Please fill all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload: Team = {
       tournamentId: selectedTournament.id,
+      teamName: teamName,
+      logoImage: logo,
+      captainId: selectedCaptainId,
       squadPlayerIds: selectedPlayerIds,
-      logo,
     };
 
-    console.log("Payload to submit:", payload);
-    alert("Team created successfully!");
+    try {
+      await addTeamAPI(payload);
+      toast({ title: "Team created successfully 🎉" });
+    } catch (err: any) {
+      console.log(err);
+      toast({
+        title: "Failed to create team",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   /* ======================================================
@@ -171,22 +305,56 @@ export default function CreateTeam() {
             </button>
 
             {nameChecked && (
-              <p
+              <span
                 className={`text-sm ${
-                  nameAvailable ? "text-green-500" : "text-red-500"
+                  nameAvailable ? "text-sm" : "text-red-500"
                 }`}
               >
                 {nameAvailable
-                  ? "Team name available"
-                  : "Team name already exists"}
-              </p>
+                  ? ": Team name available"
+                  : ": Team name already exists"}
+              </span>
             )}
-            <input
-              placeholder="Captain Name"
-              value={captainName}
-              onChange={(e) => setCaptainName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border"
-            />
+          </div>
+
+          {/* CAPTAIN */}
+          <div className="space-y-2 mt-4">
+            <label className="text-sm font-medium">Captain</label>
+
+            <div className="flex gap-2">
+              <input
+                value={captainQuery}
+                onChange={(e) => {
+                  setCaptainQuery(e.target.value);
+                  setHasSearchedCaptain(false);
+                }}
+                placeholder="Search captain"
+                className="flex-1 px-4 py-3 rounded-xl border"
+              />
+              <button
+                disabled={!captainQuery.trim()}
+                onClick={searchCaptain}
+                className="px-4 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+              >
+                Search
+              </button>
+            </div>
+
+            {filteredCaptain.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => selectCaptain(p)}
+                className="cursor-pointer px-3 py-2 bg-primary/10 rounded-lg"
+              >
+                {p.firstName} {p.middleName ?? ""} {p.lastName}
+              </div>
+            ))}
+
+            {selectedCaptainId && (
+              <span className="px-3 py-1 bg-primary/20 rounded-full text-sm">
+                Captain Selected
+              </span>
+            )}
           </div>
 
           {/* TOURNAMENT */}
@@ -195,22 +363,32 @@ export default function CreateTeam() {
 
             <div className="flex gap-2">
               <input
-                value={tournamentQuery}
+                value={
+                  tournamentId != null
+                    ? selectedTournament?.name || tournamentQuery
+                    : tournamentQuery
+                }
                 onChange={(e) => setTournamentQuery(e.target.value)}
+                disabled={tournamentId != null}
                 placeholder="Search tournament"
                 className="flex-1 px-4 py-3 rounded-xl border"
               />
-              <button className="px-4 rounded-xl bg-primary text-primary-foreground font-semibold">
+              <button
+                disabled={tournamentId != null}
+                className="px-4 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+                onClick={tournamentList}
+              >
                 Search
               </button>
             </div>
 
-            {tournamentResults.map((t) => (
+            {filteredTournamentList.map((t) => (
               <div
                 key={t.id}
                 onClick={() => {
                   setSelectedTournament(t);
-                  setTournamentResults([]);
+                  setTournamentQuery(t.name);
+                  setHasSearchedTournament(false);
                 }}
                 className="cursor-pointer px-3 py-2 bg-primary/10 rounded-lg"
               >
@@ -218,10 +396,10 @@ export default function CreateTeam() {
               </div>
             ))}
 
-            {selectedTournament && (
-              <p className="text-sm text-green-600">
-                Selected: {selectedTournament.name}
-              </p>
+            {selectedTournament && tournamentId == null && (
+              <span className="px-3 py-1 bg-primary/20 rounded-full text-sm">
+                {selectedTournament.name}
+              </span>
             )}
           </div>
 

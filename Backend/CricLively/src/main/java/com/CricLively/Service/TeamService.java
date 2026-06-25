@@ -18,6 +18,18 @@ public class TeamService {
     }
 
     public void createTeam(Team team){
+
+        for (String playerId : team.getSquadPlayerIds()) {
+
+            if (teamRepository.existsByTournamentIdAndSquadPlayerIdsContaining(
+                    team.getTournamentId(),
+                    playerId
+            )) {
+                throw new RuntimeException(
+                        "Player already exists in another team"
+                );
+            }
+        }
         teamRepository.save(team);
     }
 

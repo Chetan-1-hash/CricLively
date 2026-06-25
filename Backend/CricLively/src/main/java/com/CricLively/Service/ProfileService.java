@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -88,25 +89,30 @@ public class ProfileService {
         return registeredPlayers;
     }
 
-    @PostFilter("filterObject.role.contains(T(com.CricLively.Entities.Enums.Role).ORGANIZER)")
     public List<ProfileList> fetchProfileList() {
 
-        return profileRepository.findAll().stream().map(profile -> {
+        return profileRepository.findAll().stream()
+                .filter(
+                        p -> p.getRole().contains(Role.PLAYER) || p.getRole().contains(Role.ORGANIZER)
+                )
+                .map(profile -> {
+                    ProfileList dto = new ProfileList();
+                    dto.setId(profile.getId());
+                    dto.setRole(profile.getRole().stream()
+                            .filter(r -> r == Role.PLAYER || r == Role.ORGANIZER)
+                            .collect(Collectors.toSet())
+                    );
+                    dto.setMobileNumber(profile.getMobileNumber());
 
-            ProfileList dto = new ProfileList();
-            dto.setId(profile.getId());
-            dto.setRole(profile.getRole());
-            dto.setMobileNumber(profile.getMobileNumber());
-
-            // ONLY players have names
-            if (profile.getPlayerId() != null) {
-                Player player = playerService.getPlayer(profile.getPlayerId());
-                dto.setFirstName(player.getFirstName());
-                dto.setMiddleName(player.getMiddleName());
-                dto.setLastName(player.getLastName());
-            }
-            return dto;
-        }).toList();
+                    // ONLY players have names
+                    if (profile.getPlayerId() != null) {
+                        Player player = playerService.getPlayer(profile.getPlayerId());
+                        dto.setFirstName(player.getFirstName());
+                        dto.setMiddleName(player.getMiddleName());
+                        dto.setLastName(player.getLastName());
+                    }
+                    return dto;
+                }).toList();
     }
 
 }

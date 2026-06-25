@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TournamentResponse } from "./data/TournamentEntity";
-import TournamentAPI from "../API/TournamentDashboardAPI";
 import { toast } from "../hooks/use-toast";
+import TournamentAPI from "../API/TournamentAPI";
 
 
-export default function TournamentDashboard() {
+export default function DashboardTournament() {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
@@ -124,7 +124,11 @@ export default function TournamentDashboard() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="mt-4 w-full py-2.5 bg-accent text-accent-foreground rounded-full font-semibold text-sm shadow-md hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/matchesDashboard/${tournament.id}`)}
+                  onClick={() => navigate(`/matchesDashboard`,{
+                    state: {
+                      tournamentId: tournament.id,
+                    },
+                  })}
                 >
                   View Tournament
                 </motion.button>

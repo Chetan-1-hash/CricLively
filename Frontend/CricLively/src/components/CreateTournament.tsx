@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { AddTournamentRequest, type ProfileList } from "./data/DTO";
-import { ProfileListAPI } from "../API/ProfileListAPI";
+import { ProfileListAPI } from "../API/ProfileAPI";
 import { toast } from "../hooks/use-toast";
-import { AddTournamentAPI } from "../API/AddTournamentAPI";
+import { AddTournamentAPI, ExistByVenueAPI } from "../API/TournamentAPI";
 
 export default function CreateTournament() {
   /* ================= TOURNAMENT ================= */
@@ -23,12 +23,16 @@ export default function CreateTournament() {
   const [preview, setPreview] = useState("");
 
   /* ================= ORGANIZERS ================= */
-  const [organizers, setOrganizers] = useState<ProfileList[]>([]);
+  const [organizers, setOrganizers] = useState<ProfileList[]>([]);  
   const [organizerQuery, setOrganizerQuery] = useState("");
   const [selectedOrganizers, setSelectedOrganizers] = useState<ProfileList[]>(
     []
   );
   const [hasSearched, setHasSearched] = useState(false);
+  const [venueQuery, setVenueQuery] = useState("");
+  const [venueChecked, setVenueChecked] = useState(false);
+  const [venueAvailable, setVenueAvailable] = useState<boolean | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   /* ================= LOAD ORGANIZERS ================= */
   useEffect(() => {
@@ -38,7 +42,6 @@ export default function CreateTournament() {
   const fetchOrganizerList = async () => {
     try {
       const resp = await ProfileListAPI();
-      console.log(resp);
       setOrganizers(resp);
     } catch (err: any) {
       toast({
@@ -113,6 +116,17 @@ export default function CreateTournament() {
       ...prev,
       organizerIds: prev.organizerIds.filter((oid) => oid !== id),
     }));
+  };
+
+  const checkVenueAvailability = async () => {
+    try {
+      const exists = await ExistByVenueAPI(tournament.venue);
+
+      setVenueChecked(true);
+      setVenueAvailable(!exists);
+    } catch (e) {
+      console.log(e);
+    } 
   };
 
   /* ================= UI ================= */
@@ -197,10 +211,30 @@ export default function CreateTournament() {
             <input
               placeholder="Venue"
               value={tournament.venue}
-              onChange={(e) =>
-                setTournament({ ...tournament, venue: e.target.value })
-              }
+              onChange={(e) => {
+                setVenueChecked(false); // reset check on edit
+                setVenueAvailable(null);
+                setTournament({ ...tournament, venue: e.target.value });
+              }}
             />
+            <button
+              onClick={checkVenueAvailability}
+              className="text-sm text-primary underline"
+            >
+              Check Availability
+            </button>
+
+            {venueChecked && (
+                <span
+                  className={`text-sm ${
+                    venueAvailable ? "text-green-500" : "text-red-500"
+                  }`}
+                >
+                  {venueAvailable
+                    ? "Venue available"
+                    : "Venue already exists"}
+                </span>
+            )}
 
             {/* ORGANIZERS */}
             <div>

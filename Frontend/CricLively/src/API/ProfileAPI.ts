@@ -7,10 +7,12 @@ export async function ProfileListAPI(): Promise<ProfileList[]> {
         method:"GET"
     });
 
+
     if(!resp.ok){
         const text = await resp.text();
-        throw new Error(text || "Failed to fetch!");
+
+        throw new Error(text || "Failed to fetch!");    
     }
 
     return await resp.json();
-}
+}   

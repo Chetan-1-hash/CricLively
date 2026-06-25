@@ -2,79 +2,39 @@ import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useNavigate } from "react-router-dom";
 import { LoginRequest } from "./data/DTO";
-import { playerLogin } from "../API/PlayerLoginApi";
+import { playerLogin } from "../API/PlayerAPI";
 import { toast } from "../hooks/use-toast";
 import { useState } from "react";
-import { organizerLogin } from "../API/OrganizerLoginApi";
-import { adminLogin } from "../API/AdminLoginApi";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate(); // hook for navigation
-  type UserRole = "PLAYER" | "ORGANIZER" | "ADMIN";
-
-  const [role, setRole] = useState<UserRole>("PLAYER");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const payload: LoginRequest = { email, password, role };
+    const payload: LoginRequest = { email, password };
 
     try {
-      if (role === "PLAYER") {
-        const response = await playerLogin(payload);
+      const response = await playerLogin(payload);
 
-        sessionStorage.setItem("playerId", response.playerId);
+      sessionStorage.setItem("playerId", response.playerId);
 
-        toast({
-          title: `Welcome ${response.firstName},`,
-          description: response.message,
-          duration: 3000,
-        });
+      toast({
+        title: `Welcome ${response.firstName},`,
+        description: response.message,
+        duration: 3000,
+      });
 
-        localStorage.setItem("token", response.token);
-
-        setTimeout(() => {
-          if (response.isCricketDetailsCompleted) {
-            navigate("/showtournaments");
-          } else {
-            navigate(`/player/${response.playerId}`);
-          }
-        }, 3000);
-      } else if (role === "ORGANIZER") {
-        const response = await organizerLogin(payload);
-
-        sessionStorage.setItem("playerId", response.playerId);
-
-        toast({
-          title: `Welcome ${response.firstName},`,
-          description: response.message,
-          duration: 3000,
-        });
-
-        localStorage.setItem("token", response.token);
-
-        setTimeout(() => {
+      localStorage.setItem("token", response.token);
+      setTimeout(() => {
+        if (response.isCricketDetailsCompleted) {
           navigate("/showtournaments");
-        }, 3000);
-      } else if (role === "ADMIN") {
-        const response = await adminLogin(payload);
-
-        sessionStorage.setItem("playerId", response.playerId);
-
-        toast({
-          title: `Welcome ${response.firstName},`,
-          description: response.message,
-          duration: 3000,
-        });
-
-        localStorage.setItem("token", response.token);
-
-        setTimeout(() => {
-          navigate("/showtournaments");
-        }, 3000);
-      }
+        } else {
+          navigate(`/player/${response.playerId}`);
+        }
+      }, 3000);
     } catch (error: any) {
       console.log(error);
       toast({
@@ -126,41 +86,6 @@ export default function Login() {
 
           {/* Form */}
           <form className="space-y-4">
-            {/* Role Slider */}
-            <div className="flex justify-center mb-2">
-              <div className="relative flex bg-background/70 border border-border rounded-full p-1 w-full max-w-xs">
-                {(["PLAYER", "ORGANIZER", "ADMIN"] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRole(r)}
-                    className={`flex-1 z-10 text-xs font-semibold py-2 rounded-full transition-colors ${
-                      role === r
-                        ? "text-primary-foreground"
-                        : "text-foreground/70"
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-
-                {/* Sliding indicator */}
-                <motion.div
-                  layout
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  className="absolute top-1 bottom-1 w-1/3 bg-primary rounded-full"
-                  style={{
-                    left:
-                      role === "PLAYER"
-                        ? "0%"
-                        : role === "ORGANIZER"
-                        ? "33.33%"
-                        : "66.66%",
-                  }}
-                />
-              </div>
-            </div>
-
             {/* Email */}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1.5">

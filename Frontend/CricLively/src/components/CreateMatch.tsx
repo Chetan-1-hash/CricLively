@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
-import { useParams } from "react-router-dom";
-import TournamentAPI from "../API/TournamentDashboardAPI";
+import { useLocation } from "react-router-dom";
+import TournamentListAPI from "../API/TournamentAPI";
 import { toast } from "../hooks/use-toast";
 import type { TournamentResponse } from "./data/TournamentEntity";
 
 export default function CreateMatch() {
-  const { tournamentId } = useParams<{ tournamentId: string }>();
+  const location = useLocation();
+  const tournamentId = location.state;
   const [tournamentName, setTournamentName] = useState("");
   const [team1, setTeam1] = useState("");
   const [team2, setTeam2] = useState("");
@@ -51,16 +52,15 @@ export default function CreateMatch() {
   }
   
 
-
   useEffect(() => {
     fetchTournamentName();
   }, []);
 
   const fetchTournamentName = async () => {
     try {
-      const resp: TournamentResponse[] = await TournamentAPI();
+      const resp: TournamentResponse[] = await TournamentListAPI();
       const filteredTournament = resp.find(
-        (t) => String(t.id) === tournamentId
+        (t) => String(t.id) === tournamentId.tournamentId
       );
       if (filteredTournament) {
         setTournamentName(filteredTournament.name);
@@ -96,9 +96,10 @@ export default function CreateMatch() {
           {/* FORM */}
           <div className="space-y-6">
             {/* TOURNAMENT */}
-            <input
-              disabled
+            <input  
+              disabled={tournamentName.trim() !== ""}
               value={tournamentName}
+              onChange={ (e) => setTournamentName(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
             />
 

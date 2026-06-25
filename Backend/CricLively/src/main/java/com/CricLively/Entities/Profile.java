@@ -16,7 +16,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Document
 public class Profile {
-
     @Id
     private String id;
     @Indexed(unique = true)

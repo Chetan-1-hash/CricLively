@@ -1,4 +1,5 @@
 import type { AddTournamentRequest } from "../components/data/DTO";
+import type { TournamentResponse } from "../components/data/TournamentEntity";
 
 export async function AddTournamentAPI(tournament: AddTournamentRequest) {
   const formData = new FormData();
@@ -38,4 +39,43 @@ export async function AddTournamentAPI(tournament: AddTournamentRequest) {
   }
 
   return resp.json(); // ✅ assumes backend returns valid JSON
+}
+
+
+export default async function TournamentListAPI(): Promise<TournamentResponse[]> {
+  const resp = await fetch("http://localhost:8080/tournaments",{
+    method:"GET",
+    credentials:"include",
+    headers: {
+      "Accept": "application/json",
+    },
+  });
+
+  if (!resp.ok) {
+    throw new Error("Failed to fetch tournaments");
+  }
+
+  // Parse the tournaments JSON
+  const tournaments: TournamentResponse[] = JSON.parse(await resp.text());
+
+  // Map each tournament to include the full image URL
+  const tournamentsWithImageUrl = tournaments.map(t => ({
+    ...t,
+    coverImage: `http://localhost:8080/images/${t.coverImage}`
+  }));
+
+  return tournamentsWithImageUrl;
+}
+
+export async function ExistByVenueAPI(venue: string): Promise<boolean>{
+  const response = await fetch(`http://localhost:8080/tournaments/venue-exists?venue=${venue}`,{
+    method: "GET",
+    credentials: "include"
+  })
+
+  if(!response.ok){
+    throw new Error("Failed to verify venue");
+  }
+
+  return await response.json();
 }

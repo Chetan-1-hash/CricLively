@@ -10,14 +10,14 @@ import Registration from "./components/Registration";
 import Matches from "./components/Matches";
 import Stats from "./components/Stats";
 import PlayerCricketDetails from "./components/PlayerCricketDetails";
-import TournamentDashboard from "./components/TournamentDashboard";
+import DashboardTournament from "./components/DashboardTournament";
 import CreateTeam from "./components/CreateTeam";
 import CreateTournament from "./components/CreateTournament";
-import MatchDashboard from "./components/MatchesDashboard";
 import TournamentLayout from "./pages/Tournamentlayout";
 import MatchLayout from "./pages/Matchlayout";
 import CreateMatch from "./components/CreateMatch";
 import GallerySection from "./components/GallerySection";
+import DashboardMatches from "./components/DashboardMatches";
 
 const queryClient = new QueryClient();
 
@@ -32,11 +32,11 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
           <Route path="/showTournaments" element={<TournamentLayout />}>
-            <Route index element={<TournamentDashboard />} />
+            <Route index element={<DashboardTournament />} />
             <Route path="createTournament" element={<CreateTournament />} />
           </Route>
-          <Route path="/matchesDashboard/:tournamentId" element={<MatchLayout />}>
-            <Route index element={<MatchDashboard />} />
+          <Route path="/matchesDashboard" element={<MatchLayout />}>
+            <Route index element={<DashboardMatches />} />
             <Route path="createMatch" element={<CreateMatch />} />
             <Route path="createTeam" element={<CreateTeam />} />
           </Route>

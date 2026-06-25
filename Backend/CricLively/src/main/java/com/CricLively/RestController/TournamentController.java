@@ -8,6 +8,7 @@ import com.CricLively.Service.ImageStorageService;
 import com.CricLively.Service.TournamentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,6 +57,10 @@ public class TournamentController {
         }
     }
 
-
+    @GetMapping("/venue-exists")
+    public ResponseEntity<Boolean> getVenue(@RequestParam String venue){
+        System.out.println("Controller: "+venue);
+        return ResponseEntity.ok(tournamentService.existsByVenue(venue));
+    }
 
 }

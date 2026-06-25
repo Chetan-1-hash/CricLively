@@ -49,6 +49,7 @@ public class TournamentService {
         tournament.setFormat(addTournament.getFormat());
         tournament.setStartDate(addTournament.getStartDate());
         tournament.setEndDate(addTournament.getEndDate());
+        tournament.setVenue(addTournament.getVenue());
         LocalDate today = LocalDate.now();
 
         TournamentStatus status =today.isBefore(addTournament.getStartDate())
@@ -59,6 +60,10 @@ public class TournamentService {
         tournamentRepository.save(tournament);
     }
 
-
+    public List<String> existsByVenue(String venue){
+        return tournamentRepository.findAll().stream()
+                .filter( v -> v.getVenue())
+                .collect(Collectors.toSet());
+    }
 
 }

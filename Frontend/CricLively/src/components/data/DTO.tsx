@@ -1,23 +1,22 @@
 import type { BattingStyle, BowlingStyle, PlayingRole } from "./Player";
 
-export class LoginRequest{
-    email !: string;
-    password !: string;
-    role! : string;
+export class LoginRequest {
+  email!: string;
+  password!: string;
 
-    constructor(init?: Partial<LoginRequest>) {
+  constructor(init?: Partial<LoginRequest>) {
     Object.assign(this, init);
   }
 }
 
 export interface PlayerRegisterRequest {
   firstName: string;
-  middleName?: string;    
+  middleName?: string;
   lastName: string;
-  dob: string;            // "yyyy-MM-dd" format as expected by backend
+  dob: string; // "yyyy-MM-dd" format as expected by backend
   email: string;
   mobileNumber: string;
-  password: string;       // this will be sent but never stored/displayed on frontend
+  password: string; // this will be sent but never stored/displayed on frontend
 }
 
 export function parseFullName(fullName: string) {
@@ -52,53 +51,67 @@ export class PlayerCricketDetailsRequest {
   }
 }
 
-export class ProfileList{
-  id! : string; 
-  mobileNumber! : string;
-  firstName! : string;
-  middleName? : string;
-  lastName! : string;
-  role! : string;
+export class ProfileList {
+  id!: string;
+  mobileNumber!: string;
+  firstName!: string;
+  middleName?: string;
+  lastName!: string;
 
   constructor(init?: Partial<ProfileList>) {
     Object.assign(this, init);
   }
 }
 
-export class TeamsList{
-  id! : string;
-  name! : string;
+export class TeamsList {
+  id!: string;
+  tournamentId!: string;
+  teamName!: string;
+  squadPlayerIds!:string[];
 
   constructor(init?: Partial<TeamsList>) {
     Object.assign(this, init);
   }
 }
 
-export class TournamentList{
-  id! : string;
-  name! : string;
+export class Team {
+  id?: string;
+  tournamentId!: string;
+  teamName!: string;
+  logoImage!: File;
+  captainId!: string;
+  squadPlayerIds! : string[];
+
+  constructor(init?: Partial<Team>) {
+    Object.assign(this, init);
+  }
+}
+
+export class TournamentList {
+  id!: string;
+  name!: string;
 
   constructor(init?: Partial<TournamentList>) {
     Object.assign(this, init);
   }
 }
 
-export class AddTournamentRequest{
-  name! : string;
-  coverImage! : File;
-  organizerIds! : string[];
-  format! : string;
-  startDate! : string;
-  endDate! : string;
+export class AddTournamentRequest {
+  name!: string;
+  coverImage!: File;
+  organizerIds!: string[];
+  format!: string;
+  startDate!: string;
+  endDate!: string;
   venue!: string;
-  
+
   constructor(init?: Partial<AddTournamentRequest>) {
     Object.assign(this, init);
   }
 }
 
-export class Gallery{
-  imageId! : string;
-  fileName! : string;
-  year! : number;
+export class Gallery {
+  imageId!: string;
+  fileName!: string;
+  year!: number;
 }

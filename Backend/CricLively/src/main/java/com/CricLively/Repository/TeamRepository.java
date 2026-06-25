@@ -11,7 +11,10 @@ import java.util.List;
 public interface TeamRepository extends MongoRepository<Team, String> {
 
     String findTeamNameById(String id);
-
     List<TeamsList> findAllBy();
+    boolean existsByTournamentIdAndSquadPlayerIdsContaining(
+            String tournamentId,
+            String playerId
+    );
 
 }

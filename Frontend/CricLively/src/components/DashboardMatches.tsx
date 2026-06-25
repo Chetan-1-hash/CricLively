@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
 import MatchCard from "../components/MatchCard";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* ------------------ DUMMY DATA ------------------ */
 
@@ -44,8 +44,10 @@ const matches = [
 
 /* ------------------------------------------------ */
 
-export default function MatchDashboard() {
-  const { tournamentId } = useParams<{ tournamentId: string }>();
+export default function DashboardMatches() {
+  const location = useLocation();
+  const tournamentId = location.state?.tournamentId;
+  
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -56,13 +58,11 @@ export default function MatchDashboard() {
     "live" | "upcoming" | "completed"
   >("live");
 
-   useEffect(() => {
+  useEffect(() => {
     if (!tournamentId) return;
-
     // Call API using tournamentId
     // fetchMatchesByTournament(tournamentId);
   }, [tournamentId]);
-
 
   const filteredMatches = matches.filter((m) => m.status === matchFilter);
 
@@ -71,9 +71,17 @@ export default function MatchDashboard() {
   const handleActionClick = (action: string) => {
     setDropdownOpen(false);
     if (action === "New Match") {
-      navigate(`/matchesDashboard/${tournamentId}/createMatch`);
+      navigate(`/matchesDashboard/createMatch`,{
+        state: {
+          tournamentId: tournamentId,
+        },
+      });
     } else if (action === "New Team") {
-      navigate(`/matchesDashboard/${tournamentId}/createTeam`);
+      navigate(`/matchesDashboard/createTeam`,{
+        state: {
+          tournamentId: tournamentId,
+        },
+      });
     }
   };
 
@@ -112,7 +120,7 @@ export default function MatchDashboard() {
                 exit={{ opacity: 0, y: -10 }}
                 className="absolute right-0 mt-2 w-40 bg-card/90 backdrop-blur-xl rounded-xl shadow-xl overflow-hidden z-50"
               >
-                {[ "New Match", "New Team"].map((item) => (
+                {["New Match", "New Team"].map((item) => (
                   <button
                     key={item}
                     onClick={() => handleActionClick(item)}
@@ -182,19 +190,30 @@ export default function MatchDashboard() {
 
                 {/* MATCH CARDS */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredMatches.map((match, index) => (
-                    <MatchCard
-                      key={match.id}
-                      index={index}
-                      team1={match.team1}
-                      team2={match.team2}
-                      team1Score={match.team1Score}
-                      team2Score={match.team2Score}
-                      status={match.status as any}
-                      time={match.time}
-                      venue={match.venue}
-                    />
-                  ))}
+                  {filteredMatches.length > 0 ? (
+                    filteredMatches.map((match, index) => (
+                      <MatchCard
+                        key={match.id}
+                        index={index}
+                        team1={match.team1}
+                        team2={match.team2}
+                        team1Score={match.team1Score}
+                        team2Score={match.team2Score}
+                        status={match.status as any}
+                        time={match.time}
+                        venue={match.venue}
+                      />
+                    ))
+                  ) : (
+                    <div className="col-span-full flex justify-center items-center py-20">
+                      <div className="text-center bg-card/70 backdrop-blur-xl px-8 py-10 rounded-2xl shadow-lg">
+                        <h3 className="text-xl font-semibold mb-2">
+                          Matches will appear here
+                        </h3>
+                        <p className="text-foreground/60">Very soon.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
