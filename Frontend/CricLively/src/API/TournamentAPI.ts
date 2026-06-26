@@ -67,8 +67,8 @@ export default async function TournamentListAPI(): Promise<TournamentResponse[]>
   return tournamentsWithImageUrl;
 }
 
-export async function ExistByVenueAPI(venue: string): Promise<boolean>{
-  const response = await fetch(`http://localhost:8080/tournaments/venue-exists?venue=${venue}`,{
+export async function ExistByVenueAPI(): Promise<string[]>{
+  const response = await fetch(`http://localhost:8080/tournaments/venue-exists`,{
     method: "GET",
     credentials: "include"
   })

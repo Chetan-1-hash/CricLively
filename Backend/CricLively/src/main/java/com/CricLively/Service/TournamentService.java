@@ -44,7 +44,7 @@ public class TournamentService {
     public void createTournament(AddTournamentRequest addTournament){
         Tournament tournament = new Tournament();
         tournament.setName(addTournament.getName());
-        tournament.setCoverImage(addTournament.getCoverImage().toString());
+        tournament.setCoverImage(addTournament.getCoverImage());
         tournament.setOrganizerIds(addTournament.getOrganizerIds());
         tournament.setFormat(addTournament.getFormat());
         tournament.setStartDate(addTournament.getStartDate());
@@ -60,10 +60,10 @@ public class TournamentService {
         tournamentRepository.save(tournament);
     }
 
-    public List<String> existsByVenue(String venue){
+    public List<String> venuesList(){
         return tournamentRepository.findAll().stream()
-                .filter( v -> v.getVenue())
-                .collect(Collectors.toSet());
+                .map(Tournament::getVenue)
+                .collect(Collectors.toList());
     }
 
 }

@@ -23,20 +23,18 @@ export default function CreateTournament() {
   const [preview, setPreview] = useState("");
 
   /* ================= ORGANIZERS ================= */
-  const [organizers, setOrganizers] = useState<ProfileList[]>([]);  
+  const [organizers, setOrganizers] = useState<ProfileList[]>([]);
   const [organizerQuery, setOrganizerQuery] = useState("");
   const [selectedOrganizers, setSelectedOrganizers] = useState<ProfileList[]>(
     []
   );
   const [hasSearched, setHasSearched] = useState(false);
-  const [venueQuery, setVenueQuery] = useState("");
-  const [venueChecked, setVenueChecked] = useState(false);
-  const [venueAvailable, setVenueAvailable] = useState<boolean | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [venues, setVenues] = useState<string[]>([]);
 
   /* ================= LOAD ORGANIZERS ================= */
   useEffect(() => {
     fetchOrganizerList();
+    venueList();
   }, []);
 
   const fetchOrganizerList = async () => {
@@ -118,15 +116,13 @@ export default function CreateTournament() {
     }));
   };
 
-  const checkVenueAvailability = async () => {
+  const venueList = async () => {
     try {
-      const exists = await ExistByVenueAPI(tournament.venue);
-
-      setVenueChecked(true);
-      setVenueAvailable(!exists);
+      const data = await ExistByVenueAPI();
+      setVenues(data);
     } catch (e) {
       console.log(e);
-    } 
+    }
   };
 
   /* ================= UI ================= */
@@ -208,33 +204,24 @@ export default function CreateTournament() {
               />
             </div>
 
-            <input
-              placeholder="Venue"
+            <select
               value={tournament.venue}
-              onChange={(e) => {
-                setVenueChecked(false); // reset check on edit
-                setVenueAvailable(null);
-                setTournament({ ...tournament, venue: e.target.value });
-              }}
-            />
-            <button
-              onClick={checkVenueAvailability}
-              className="text-sm text-primary underline"
+              onChange={(e) =>
+                setTournament({
+                  ...tournament,
+                  venue: e.target.value,
+                })
+              }
+              className="w-full px-4 py-3 rounded-xl border"
             >
-              Check Availability
-            </button>
+              <option value="" className="bg-[#87cd37] text-white border rounded px-3 py-2">Select Venue</option>
 
-            {venueChecked && (
-                <span
-                  className={`text-sm ${
-                    venueAvailable ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {venueAvailable
-                    ? "Venue available"
-                    : "Venue already exists"}
-                </span>
-            )}
+              {venues.map((venue) => (
+                <option key={venue} value={venue} className="bg-[#87cd37] text-white border rounded px-3 py-2">
+                  {venue}
+                </option>
+              ))}
+            </select>
 
             {/* ORGANIZERS */}
             <div>

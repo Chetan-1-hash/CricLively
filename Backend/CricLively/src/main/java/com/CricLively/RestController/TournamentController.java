@@ -58,9 +58,8 @@ public class TournamentController {
     }
 
     @GetMapping("/venue-exists")
-    public ResponseEntity<Boolean> getVenue(@RequestParam String venue){
-        System.out.println("Controller: "+venue);
-        return ResponseEntity.ok(tournamentService.existsByVenue(venue));
+    public ResponseEntity<List<String>> getVenue(){
+        return ResponseEntity.ok(tournamentService.venuesList());
     }
 
 }
