@@ -38,22 +38,29 @@ public class TournamentController {
             @RequestPart(value = "coverImage", required = false) MultipartFile coverImage
     ) {
         try {
-            // Convert JSON string to DTO
             ObjectMapper mapper = new ObjectMapper();
             AddTournamentRequest tournament = mapper.readValue(data, AddTournamentRequest.class);
 
-            // Use ImageStorageService to store the file in GridFS
             if (coverImage != null && !coverImage.isEmpty()) {
-                String imageId = imageStorageService.store(coverImage); // store image in GridFS
-                tournament.setCoverImage(imageId); // save GridFS ID, not filename
+                String imageId = imageStorageService.store(coverImage);
+                tournament.setCoverImage(imageId);
             }
 
             tournamentService.createTournament(tournament);
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Tournament created successfully", "tournament", tournament));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(Map.of(
+                            "message", "Tournament created successfully",
+                            "tournament", tournament
+                    ));
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", e.getMessage()));
+
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", e.getMessage()));
         }
     }
 

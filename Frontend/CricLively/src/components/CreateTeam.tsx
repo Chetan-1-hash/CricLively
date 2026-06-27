@@ -6,7 +6,7 @@ import { ProfileListAPI } from "../API/ProfileAPI";
 import { addTeamAPI, TeamsListAPI } from "../API/TeamsAPI";
 import TournamentAPI from "../API/TournamentAPI";
 import { toast } from "../hooks/use-toast";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type Tournament = {
   id: string;
@@ -42,6 +42,7 @@ export default function CreateTeam() {
   const [logo, setLogo] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
 
+  const navigate = useNavigate();
   const location = useLocation();
   const tournamentId = location.state?.tournamentId;
 
@@ -218,6 +219,9 @@ export default function CreateTeam() {
         description: "Please fill all required fields",
         variant: "destructive",
       });
+      setTimeout(() => {
+        navigate("/matchesDashboard");
+      }, 2000);
       return;
     }
 
@@ -242,9 +246,6 @@ export default function CreateTeam() {
     }
   };
 
-  /* ======================================================
-     UI
-  ====================================================== */
   return (
     <>
       <Navbar />

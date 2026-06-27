@@ -32,6 +32,7 @@ export class TournamentResponse {
   coverImage!: string;
   startDate!: string;
   endDate!: string;
+  venue!: string;
   tournamentStatus!: TournamentStatus;
   teamIds: string[] = [];
 }

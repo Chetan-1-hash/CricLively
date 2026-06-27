@@ -3,87 +3,62 @@ import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
 import MatchCard from "../components/MatchCard";
 import { useLocation, useNavigate } from "react-router-dom";
+import { MatchResponse } from "./data/MatchEntity";
+import { getTournamentMatches } from "../API/MatchApi";
 
-/* ------------------ DUMMY DATA ------------------ */
-
-const tournament = {
-  name: "CricLively Premier League",
-  coverImage: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e",
-};
-
-const matches = [
-  {
-    id: 1,
-    team1: "Mumbai Indians",
-    team2: "Chennai Super Kings",
-    team1Score: "182/6 (20)",
-    team2Score: "95/3 (10.2)",
-    status: "live",
-    venue: "Wankhede Stadium",
-  },
-  {
-    id: 2,
-    team1: "RCB",
-    team2: "KKR",
-    team1Score: "",
-    team2Score: "",
-    status: "upcoming",
-    time: "Today • 7:30 PM",
-    venue: "Chinnaswamy Stadium",
-  },
-  {
-    id: 3,
-    team1: "GT",
-    team2: "LSG",
-    team1Score: "168/8 (20)",
-    team2Score: "170/4 (18.5)",
-    status: "completed",
-    venue: "Narendra Modi Stadium",
-  },
-];
-
-/* ------------------------------------------------ */
 
 export default function DashboardMatches() {
   const location = useLocation();
-  const tournamentId = location.state?.tournamentId;
-  
+  const tournamentDetails = location.state?.tournament;
+
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [activeTab, setActiveTab] = useState<
     "matches" | "points" | "leaderboard"
   >("matches");
 
   const [matchFilter, setMatchFilter] = useState<
-    "live" | "upcoming" | "completed"
-  >("live");
+    "LIVE" | "UPCOMING" | "FINISHED" | "ABANDONED"
+  >("LIVE");
 
   useEffect(() => {
-    if (!tournamentId) return;
-    // Call API using tournamentId
-    // fetchMatchesByTournament(tournamentId);
-  }, [tournamentId]);
+    if (!tournamentDetails) return;
+    loadAllMatches();
+  }, [tournamentDetails]);
 
-  const filteredMatches = matches.filter((m) => m.status === matchFilter);
+  const loadAllMatches = async () => {
+    try {
+      const data = await getTournamentMatches(tournamentDetails.id);
+      setMatches(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const filteredMatches = matches.filter(
+    (m) => m.tournamentId === tournamentDetails.id && m.matchStatus === matchFilter
+);
 
   const handleDropdownToggle = () => setDropdownOpen(!dropdownOpen);
 
   const handleActionClick = (action: string) => {
     setDropdownOpen(false);
     if (action === "New Match") {
-      navigate(`/matchesDashboard/createMatch`,{
+      navigate(`/matchesDashboard/createMatch`, {
         state: {
-          tournamentId: tournamentId,
+          tournamentId: tournamentDetails.id,
         },
       });
     } else if (action === "New Team") {
-      navigate(`/matchesDashboard/createTeam`,{
+      navigate(`/matchesDashboard/createTeam`, {
         state: {
-          tournamentId: tournamentId,
+          tournamentId: tournamentDetails.id,
         },
       });
     }
   };
+  
 
   return (
     <>
@@ -93,12 +68,12 @@ export default function DashboardMatches() {
         {/* COVER SECTION */}
         <section className="h-[30vh] relative">
           <img
-            src={tournament.coverImage}
+            src={tournamentDetails.coverImage}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
             <h1 className="text-4xl md:text-5xl font-bold text-white">
-              {tournament.name}
+              {tournamentDetails.name}
             </h1>
           </div>
           {/* + Button */}
@@ -118,6 +93,7 @@ export default function DashboardMatches() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
                 className="absolute right-0 mt-2 w-40 bg-card/90 backdrop-blur-xl rounded-xl shadow-xl overflow-hidden z-50"
               >
                 {["New Match", "New Team"].map((item) => (
@@ -171,7 +147,7 @@ export default function DashboardMatches() {
               >
                 {/* MATCH FILTER */}
                 <div className="flex gap-3 mb-8">
-                  {["live", "upcoming", "completed"].map((status) => (
+                  {["LIVE" , "FINISHED" , "ABANDONED" , "UPCOMING"].map((status) => (
                     <motion.button
                       key={status}
                       whileHover={{ scale: 1.05 }}
@@ -192,17 +168,25 @@ export default function DashboardMatches() {
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredMatches.length > 0 ? (
                     filteredMatches.map((match, index) => (
-                      <MatchCard
-                        key={match.id}
+                     <MatchCard
+                        key={match.matchId}
                         index={index}
-                        team1={match.team1}
-                        team2={match.team2}
-                        team1Score={match.team1Score}
-                        team2Score={match.team2Score}
-                        status={match.status as any}
-                        time={match.time}
+                        team1={match.teamAName}
+                        team2={match.teamBName}
+                        team1Score={
+                            match.firstInnings
+                                ? `${match.firstInnings.runs}/${match.firstInnings.wickets} (${match.firstInnings.overs})`
+                                : ""
+                        }
+                        team2Score={
+                            match.secondInnings
+                                ? `${match.secondInnings.runs}/${match.secondInnings.wickets} (${match.secondInnings.overs})`
+                                : ""
+                        }
+                        status={match.matchStatus}
+                        time={`${match.date} ${match.time}`}
                         venue={match.venue}
-                      />
+                    />
                     ))
                   ) : (
                     <div className="col-span-full flex justify-center items-center py-20">

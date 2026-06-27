@@ -126,7 +126,7 @@ export default function DashboardTournament() {
                   className="mt-4 w-full py-2.5 bg-accent text-accent-foreground rounded-full font-semibold text-sm shadow-md hover:shadow-lg transition-shadow"
                   onClick={() => navigate(`/matchesDashboard`,{
                     state: {
-                      tournamentId: tournament.id,
+                      tournament: tournament,
                     },
                   })}
                 >

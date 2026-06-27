@@ -34,6 +34,7 @@ public class TournamentService {
         dto.setCoverImage(tournament.getCoverImage());
         dto.setStartDate(tournament.getStartDate());
         dto.setEndDate(tournament.getEndDate());
+        dto.setVenue(tournament.getVenue());
 //        dto.setTeamIds(tournament.getTeamIds());
         dto.setTournamentStatus(tournament.getTournamentStatus());
 
@@ -42,6 +43,18 @@ public class TournamentService {
 
 
     public void createTournament(AddTournamentRequest addTournament){
+
+        boolean exists = tournamentRepository.existsByNameAndVenueAndStartDateAndEndDate(
+                addTournament.getName(),
+                addTournament.getVenue(),
+                addTournament.getStartDate(),
+                addTournament.getEndDate()
+        );
+
+        if (exists) {
+            throw new RuntimeException("Tournament already exists with the same name, venue and dates.");
+        }
+
         Tournament tournament = new Tournament();
         tournament.setName(addTournament.getName());
         tournament.setCoverImage(addTournament.getCoverImage());
@@ -51,6 +64,7 @@ public class TournamentService {
         tournament.setEndDate(addTournament.getEndDate());
         tournament.setVenue(addTournament.getVenue());
         LocalDate today = LocalDate.now();
+
 
         TournamentStatus status =today.isBefore(addTournament.getStartDate())
                         ? TournamentStatus.UPCOMING

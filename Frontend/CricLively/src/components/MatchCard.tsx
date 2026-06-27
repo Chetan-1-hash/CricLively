@@ -23,13 +23,13 @@ export default function MatchCard({
       {/* Status Badge */}
       <div className="flex items-center justify-between mb-4">
         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-          status === 'live' 
+          status === 'LIVE' 
             ? 'bg-accent text-accent-foreground' 
-            : status === 'upcoming'
+            : status === 'UPCOMING'
             ? 'bg-foreground/20 text-foreground'
             : 'bg-secondary text-secondary-foreground'
         }`}>
-          {status === 'live' && (
+          {status === 'LIVE' && (
             <span className="inline-flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75"></span>
@@ -38,8 +38,10 @@ export default function MatchCard({
               LIVE
             </span>
           )}
-          {status === 'upcoming' && 'UPCOMING'}
-          {status === 'completed' && 'COMPLETED'}
+          {status === 'LIVE'}
+          {status === 'UPCOMING'}
+          {status === 'FINISHED'}
+          {status === 'ABANDONED'}
         </span>
         {time && (
           <span className="text-sm text-foreground/70">{time}</span>

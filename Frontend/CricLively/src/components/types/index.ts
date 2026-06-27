@@ -1,11 +1,11 @@
-export type MatchStatus = "live" | "upcoming" | "completed";
+export type MatchStatus = 'LIVE' | 'FINISHED' | 'ABANDONED'| 'UPCOMING';
 
 export interface MatchCardProps {
   team1: string;
   team2: string;
   team1Score?: string;
   team2Score?: string;
-  status: 'live' | 'upcoming' | 'completed';
+  status: 'LIVE' | 'FINISHED' | 'ABANDONED'| 'UPCOMING';
   time?: string;
   venue: string;
   index: number;
