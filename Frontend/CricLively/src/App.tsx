@@ -18,6 +18,8 @@ import MatchLayout from "./pages/Matchlayout";
 import CreateMatch from "./components/CreateMatch";
 import GallerySection from "./components/GallerySection";
 import DashboardMatches from "./components/DashboardMatches";
+import ViewerPage from "./components/viewer";
+import Scorer from "./components/Scorer";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,8 @@ const App = () => (
           </Route>
           <Route path="/matches" element={<Matches />} />
           <Route path="/gallery" element={<GallerySection/>} />
+          <Route path="/scorer" element={<Scorer/>} />
+          <Route path="/viewer" element={<ViewerPage/>} />
           <Route path="/player/:playerId" element={<PlayerCricketDetails />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="*" element={<NotFound />} />

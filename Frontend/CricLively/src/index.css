@@ -12,6 +12,7 @@ body::-webkit-scrollbar {
   display: none;              /* Chrome, Safari */
 }
 
+
 @theme {
   /* This maps your CSS variables to Tailwind utility classes */
   --color-background: hsl(var(--background));
