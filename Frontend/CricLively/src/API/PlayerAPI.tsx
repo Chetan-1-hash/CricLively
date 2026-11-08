@@ -1,18 +1,23 @@
 import type { LoginRequest } from "../components/data/DTO";
+import { api } from "./client";
+
+export const playerLogin = (request: LoginRequest) =>
+  api("/profile/login", { method: "POST", body: request, redirectOn401: false });
 
 
-export async function playerLogin(request : LoginRequest): Promise<any>{
-    const response = await fetch("http://localhost:8080/profile/login", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(request),
-        credentials: "include",
-    });
-
-    if(!response.ok){
-        const text = await response.json();
-        throw new Error(text.message || "Login Failed!");
-    }
-
-    return await response.json();
+export interface AdminLoginResponse {
+  playerId: string;
+  firstName: string;
+  role: "ADMIN";
+  message: string;
 }
+
+export const adminLogin = (request: LoginRequest) =>
+  api<AdminLoginResponse>("/admin/login", { method: "POST", body: request, redirectOn401: false });
+
+export const adminMe = () =>
+  api("/admin/me", { redirectOn401: false })
+    .then(() => true)
+    .catch(() => false);
+
+export const adminLogout = () => api("/admin/logout", { method: "POST" });

@@ -300,7 +300,7 @@ export default function Scorer() {
                 setIsWicket(!isWicket);
                 if (!isWicket) setPendingOutPlayerId(innings.strikerId);
               }}
-              className={`w-14 h-7 rounded-full transition-colors relative ${isWicket ? "bg-red-600" : "bg-background/60"}`}
+              className={`w-14 h-7 rounded-full border border-white/100 transition-colors relative ${isWicket ? "bg-red-600" : "bg-background/60"}`}
             >
               <motion.span
                 className="absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow"

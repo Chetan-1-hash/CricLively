@@ -5,23 +5,23 @@ import com.CricLively.Entities.Player;
 import com.CricLively.Entities.Profile;
 import com.CricLively.Repository.ProfileRepository;
 import com.CricLively.Service.PlayerService;
-import com.CricLively.Service.ProfileService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/admin")
@@ -31,43 +31,59 @@ public class AdminController {
     private final ProfileRepository profileRepository;
     private final PlayerService playerService;
     private final AuthenticationManager authenticationManager;
+    private final SecurityContextRepository securityContextRepository =
+            new HttpSessionSecurityContextRepository();
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest){
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-
-        boolean isAdmin = authentication.getAuthorities().stream().anyMatch(
-                auth -> Objects.equals(auth.getAuthority(), "ROLE_ADMIN")
-        );
-
-        if(!isAdmin){
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Only ADMIN can login"));
+    public ResponseEntity<?> login(@RequestBody LoginRequest request,
+                                   HttpServletRequest httpReq,
+                                   HttpServletResponse httpRes) {
+        Authentication auth;
+        try {
+            auth = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        } catch (AuthenticationException e) {
+            return invalid();
         }
-        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        httpRequest.getSession().setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                SecurityContextHolder.getContext()
-        );
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        if (!isAdmin) return invalid(); // same response as bad password
 
-        authentication.getAuthorities().forEach(auth ->
-                System.out.println("AUTHORITY: " + auth.getAuthority())
-        );
+        if (httpReq.getSession(false) != null) httpReq.changeSessionId(); // anti session-fixation
 
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(auth);
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, httpReq, httpRes);
 
-        Profile profile = this.profileRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Email not found"));
-
+        Profile profile = profileRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new IllegalStateException("Profile missing for authenticated user"));
         Player player = playerService.getPlayer(profile.getPlayerId());
 
         return ResponseEntity.ok(Map.of(
                 "playerId", player.getId(),
                 "firstName", player.getFirstName(),
-                "isCricketDetailsCompleted", player.isCricketDetailsCompleted(),
-                "message", "Login Successful"
+                "role", "ADMIN",
+                "message", "Admin access granted"
         ));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<?> me(Authentication auth) {
+        return ResponseEntity.ok(Map.of("email", auth.getName(), "role", "ADMIN"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest req) {
+        HttpSession s = req.getSession(false);
+        if (s != null) s.invalidate();
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.ok(Map.of("message", "Logged out"));
+    }
+
+    private ResponseEntity<?> invalid() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Invalid credentials"));
+    }
 }
