@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 public class Wicket {
 
     private String playerOutId;    // The ID of the batsman who is out
-    private enum outType{
+    private OutType outType;
+    public enum OutType {
         BOWLED,
         CAUGHT,
         LBW,
@@ -19,7 +20,7 @@ public class Wicket {
         HITWICKET,
         CAUGHT_BOWLED,
         RETIRED_HURT
-    };       // Enum/String: BOWLED, CAUGHT, L_B_W, RUN_OUT, STUMPED, HIT_WICKET
+    }       // Enum/String: BOWLED, CAUGHT, L_B_W, RUN_OUT, STUMPED, HIT_WICKET
 
     // Attribution
     private String bowlerId;      // The bowler who gets the credit (null for some Run Outs)

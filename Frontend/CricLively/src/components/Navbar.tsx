@@ -27,8 +27,7 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { 
-    const token = localStorage.getItem("token");
-    setIsAuthenticated(!!token);
+    setIsAuthenticated(!!sessionStorage.getItem("playerId"));
   }, [location.pathname]);
 
   useEffect(() => {

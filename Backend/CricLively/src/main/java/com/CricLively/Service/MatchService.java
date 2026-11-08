@@ -40,6 +40,9 @@ public class MatchService {
     public List<MatchDashboardDTO> getTournamentMatches(String tournamentId) {
 
         Tournament tournament = tournamentRepository.findTournamentById(tournamentId);
+        if (tournament == null) {
+            return List.of();
+        }
 
         return matchRepository.findByTournamentId(tournamentId)
                 .stream()
@@ -53,8 +56,8 @@ public class MatchService {
     }
 
     public MatchDashboardDTO convertToDashboardDTO(Match match, Tournament tournament, Team teamA, Team teamB) {
-        String teamAName = teamA.getTeamName();
-        String teamBName = teamB.getTeamName();
+        String teamAName = teamA != null ? teamA.getTeamName() : "Unknown team";
+        String teamBName = teamB != null ? teamB.getTeamName() : "Unknown team";
         MatchDashboardDTO.MatchDashboardDTOBuilder builder = MatchDashboardDTO.builder()
                 .matchId(match.getId())
                 .tournamentId(tournament.getId())
@@ -64,21 +67,21 @@ public class MatchService {
                 .teamAName(teamAName)
                 .teamBName(teamBName)
                 .matchStatus(match.getMatchStatus());
-        if (match.getInnings1() != null & match.getMatchStatus() != MatchStatus.UPCOMING) {
-            builder.innings1(mapInnings(match.getInnings1(), teamAName, teamBName));
+        if (match.getInnings1() != null && match.getMatchStatus() != MatchStatus.UPCOMING) {
+            builder.innings1(mapInnings(match.getInnings1(), match.getTeamAId(), teamAName, teamBName));
         }
-        if (match.getInnings2() != null & match.getMatchStatus() != MatchStatus.UPCOMING) {
-            builder.innings2(mapInnings(match.getInnings2(), teamAName, teamBName));
+        if (match.getInnings2() != null && match.getMatchStatus() != MatchStatus.UPCOMING) {
+            builder.innings2(mapInnings(match.getInnings2(), match.getTeamAId(), teamAName, teamBName));
         }
 
         return builder.build();
     }
 
-    private MatchDashboardDTO.InningsSummaryDTO mapInnings(Innings innings, String teamAName, String teamBName) {
+    private MatchDashboardDTO.InningsSummaryDTO mapInnings(Innings innings, String teamAId, String teamAName, String teamBName) {
         if (innings == null) return null;
 
         // Logic to determine which team name to display based on battingTeamId
-        String battingTeamName = innings.getBattingTeamId().equals(teamAName) ? teamAName : teamBName;
+        String battingTeamName = innings.getBattingTeamId().equals(teamAId) ? teamAName : teamBName;
 
         return MatchDashboardDTO.InningsSummaryDTO.builder()
                 .battingTeamName(battingTeamName)

@@ -10,8 +10,10 @@ import lombok.NoArgsConstructor;
 public class Toss {
 
     private String winnerId;
-    private enum decision {
-        BATTING,
-        BOWLING
+    private Decision decision;
+
+    public enum Decision {
+            BATTING,
+            BOWLING
     }
 }

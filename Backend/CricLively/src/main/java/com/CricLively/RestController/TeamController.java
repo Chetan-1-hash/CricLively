@@ -52,7 +52,7 @@ public class TeamController {
                     .badRequest()
                     .body(Map.of(
                             "success", false,
-                            "message", "Team already exists: " + e.getMessage()
+                            "message", "Could not create team: " + e.getMessage()
                     ));
         }
     }

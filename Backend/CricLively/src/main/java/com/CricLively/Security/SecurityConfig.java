@@ -3,6 +3,7 @@ package com.CricLively.Security;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -36,7 +37,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests((requests) ->requests
                                 .requestMatchers("/", "/profile/login", "/player/register",
                                         "/player/register/bulk", "/player/bulk/playerInfo",
-                                        "/organizer/login", "/admin/login", "/images/**").permitAll()
+                                        "/organizer/login", "/admin/login").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
                                 .requestMatchers("/images/**").authenticated()
                                 .requestMatchers("/player/**").authenticated()
                                 .requestMatchers("/organizer/**").authenticated()

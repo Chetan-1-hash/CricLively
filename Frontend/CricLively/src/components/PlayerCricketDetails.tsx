@@ -65,8 +65,6 @@ export default function PlayerCricketDetails() {
         duration: 3000,
       });
 
-      localStorage.setItem("token", "user_token_example");
-
       setTimeout(() => {
         navigate("/showtournaments");
       }, 3000);

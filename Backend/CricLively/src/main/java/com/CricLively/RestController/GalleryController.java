@@ -23,7 +23,7 @@ public class GalleryController {
 
     @PostMapping("/addImages")
     public ResponseEntity<?> addGallery(@RequestParam MultipartFile file, @RequestParam Integer year){
-        if(file.isEmpty()){
+        if(!file.isEmpty()){
             Gallery g = this.galleryService.addImages(file,year);
             return ResponseEntity.ok().body(g);
         }
@@ -46,7 +46,7 @@ public class GalleryController {
         if(!g.isEmpty()){
             return ResponseEntity.ok().body(g);
         }
-        return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok().body(this.galleryService.getGallery());
     }
 
 }
