@@ -6,10 +6,12 @@ import com.CricLively.DTO.PlayerRegisterResponse;
 import com.CricLively.Entities.Player;
 import com.CricLively.Exceptions.RegistrationException;
 import com.CricLively.Exceptions.UpdateCricketDetailsException;
+import com.CricLively.Security.PlayerAccess;
 import com.CricLively.Service.PlayerService;
 import com.CricLively.Service.ProfileService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,8 +23,10 @@ public class PlayerController {
 
     private final PlayerService playerService;
     private final ProfileService profileService;
+    private final PlayerAccess playerAccess;
 
-    public PlayerController(PlayerService playerService, ProfileService profileService) {
+    public PlayerController(PlayerService playerService, ProfileService profileService, PlayerAccess playerAccess) {
+        this.playerAccess = playerAccess;
         this.playerService = playerService;
         this.profileService = profileService;
     }
@@ -58,7 +62,14 @@ public class PlayerController {
     @PutMapping("/{playerId}/playerInfo")
     public ResponseEntity<PlayerRegisterResponse> addCricketDetails(@PathVariable String playerId,
                                                                     @RequestPart("data") PlayerCricketDetailsRequest request,
-                                                                    @RequestPart(value = "image", required = false) MultipartFile image)throws UpdateCricketDetailsException {
+                                                                    @RequestPart(value = "image", required = false) MultipartFile image,
+                                                                    Authentication authentication) throws UpdateCricketDetailsException {
+
+        // players may only change their OWN details (admins may change anyone's)
+        if (!playerAccess.canAccessPlayer(playerId, authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    new PlayerRegisterResponse(null, null, "You can only edit your own profile"));
+        }
 
         try{
             Player updatedPlayer = this.playerService.updateCricketDetails(playerId,request,image);

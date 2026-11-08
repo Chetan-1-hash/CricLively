@@ -9,6 +9,7 @@ export async function addgalleryApi(file: File, year: number) {
     "http://localhost:8080/gallery/addImages",
     {
       method: "POST",
+      credentials: "include",
       body: formData,
     }
   );

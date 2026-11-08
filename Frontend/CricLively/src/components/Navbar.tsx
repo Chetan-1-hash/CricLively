@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate, NavLink } from "react-router-dom";
 import ImageController from "../API/ImageController";
+import { logout } from "../API/PlayerAPI";
+import { clearSession, getSession } from "../lib/auth";
 
 const authNavItems = [
   { name: "Home", to: "/" },
@@ -27,7 +29,7 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { 
-    setIsAuthenticated(!!sessionStorage.getItem("playerId"));
+    setIsAuthenticated(!!getSession());
   }, [location.pathname]);
 
   useEffect(() => {
@@ -54,9 +56,13 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("playerId");
+  const handleLogout = async () => {
+    try {
+      await logout(); // end the session on the server too
+    } catch {
+      // even if the server cannot be reached, clear this browser
+    }
+    clearSession();
     setProfileOpen(false);
     setIsAuthenticated(false);
     navigate("/login");
@@ -146,6 +152,9 @@ export default function Navbar() {
                     transition={{ duration: 0.2 }}
                     className="absolute right-0 mt-3 w-48 bg-card/90 backdrop-blur-xl rounded-xl shadow-xl overflow-hidden z-50"
                   >
+                    <div className="px-4 py-2 text-xs text-foreground/60 border-b border-border/40">
+                      {getSession()?.roles.join(" · ")}
+                    </div>
                     <button
                       onClick={() => {
                         setProfileOpen(false);

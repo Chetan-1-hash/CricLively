@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -14,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -34,26 +36,41 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests((requests) ->requests
-                                .requestMatchers("/", "/profile/login", "/player/register",
-                                        "/player/register/bulk", "/player/bulk/playerInfo",
-                                        "/organizer/login", "/admin/login").permitAll()
-                                .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
-                                .requestMatchers("/images/**").authenticated()
-                                .requestMatchers("/player/**").authenticated()
-                                .requestMatchers("/organizer/**").authenticated()
-                                .requestMatchers("/admin/**").authenticated()
-                                .requestMatchers("/profile/**").authenticated()
-                                .requestMatchers("/match/**").authenticated()
-                                .requestMatchers("/team/**").authenticated()
-                                .requestMatchers("/tournaments/**","/addTournament").authenticated()
-                                .requestMatchers("/gallery/**").authenticated()
-                                .anyRequest().authenticated()
-                        )
+                .authorizeHttpRequests(requests -> requests
+
+                        // ---------- 1. PUBLIC: no login needed ----------
+                        .requestMatchers("/", "/error").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/profile/login", "/profile/logout",
+                                "/player/register").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
+
+                        // ---------- 2. ADMIN only ----------
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/player/register/bulk", "/player/bulk/playerInfo").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/gallery/**").hasRole("ADMIN")
+
+                        // ---------- 3. ORGANIZER (and ADMIN): create and run things ----------
+                        .requestMatchers(HttpMethod.POST, "/tournaments", "/matches", "/team/addTeam",
+                                "/images/upload").hasAnyRole("ORGANIZER", "ADMIN")
+                        .requestMatchers("/profile/getProfileList").hasAnyRole("ORGANIZER", "ADMIN")
+
+                        // ---------- 4. EVERY signed-in person: view + own profile ----------
+                        .requestMatchers("/profile/me").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/player/*/playerInfo")
+                                .hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/tournaments/**", "/matches/**", "/team/**",
+                                "/gallery/**", "/player/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+
+                        // ---------- 5. Anything new is ORGANIZER/ADMIN until you decide otherwise ----------
+                        .anyRequest().hasAnyRole("ORGANIZER", "ADMIN")
+                )
 
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .httpBasic(AbstractHttpConfigurer::disable)
 //                .httpBasic(Customizer.withDefaults())
                 .userDetailsService(userDetailService)

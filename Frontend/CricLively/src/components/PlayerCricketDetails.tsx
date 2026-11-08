@@ -9,6 +9,8 @@ import {
 } from "./data/DTO";
 import { addCricketDetails } from "../API/CricketDetailsController";
 import { useNavigate } from "react-router-dom";
+import { fetchMe } from "../API/PlayerAPI";
+import { saveSession } from "../lib/auth";
 
 export default function PlayerCricketDetails() {
   const playerId: string | null = sessionStorage.getItem("playerId");
@@ -58,6 +60,13 @@ export default function PlayerCricketDetails() {
         playerId,
         payload
       );
+
+      // refresh the saved profile so "details completed" is up to date
+      try {
+        saveSession(await fetchMe());
+      } catch {
+        // not critical
+      }
 
       toast({
         title: `Welcome to CricLively, ${playerresponse.firstName}`,

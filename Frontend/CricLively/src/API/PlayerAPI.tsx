@@ -1,23 +1,12 @@
 import type { LoginRequest } from "../components/data/DTO";
+import type { MyProfile } from "../lib/auth";
 import { api } from "./client";
 
-export const playerLogin = (request: LoginRequest) =>
-  api("/profile/login", { method: "POST", body: request, redirectOn401: false });
+// One login for everybody. The server answers with the person's roles.
+export const login = (request: LoginRequest) =>
+  api<MyProfile>("/profile/login", { method: "POST", body: request, redirectOn401: false });
 
+// Who is logged in right now? (uses the session cookie)
+export const fetchMe = () => api<MyProfile>("/profile/me", { redirectOn401: false });
 
-export interface AdminLoginResponse {
-  playerId: string;
-  firstName: string;
-  role: "ADMIN";
-  message: string;
-}
-
-export const adminLogin = (request: LoginRequest) =>
-  api<AdminLoginResponse>("/admin/login", { method: "POST", body: request, redirectOn401: false });
-
-export const adminMe = () =>
-  api("/admin/me", { redirectOn401: false })
-    .then(() => true)
-    .catch(() => false);
-
-export const adminLogout = () => api("/admin/logout", { method: "POST" });
+export const logout = () => api("/profile/logout", { method: "POST", redirectOn401: false });

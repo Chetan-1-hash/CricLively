@@ -1,3 +1,4 @@
+import { canOrganize } from "../lib/auth";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
@@ -12,6 +13,7 @@ export default function DashboardMatches() {
   const tournamentDetails = location.state?.tournament;
 
   const navigate = useNavigate();
+  const organizer = canOrganize(); // only organizers/admins see the create menu
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -77,6 +79,7 @@ export default function DashboardMatches() {
             </h1>
           </div>
           {/* + Button */}
+          {organizer && (
           <div className="absolute top-4 right-8 z-50">
             <motion.button
               onClick={handleDropdownToggle}
@@ -108,6 +111,7 @@ export default function DashboardMatches() {
               </motion.div>
             )}
           </div>
+          )}
         </section>
 
         {/* DASHBOARD */}

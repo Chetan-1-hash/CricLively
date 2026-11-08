@@ -1,3 +1,4 @@
+import { canOrganize } from "../lib/auth";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +9,7 @@ import TournamentAPI from "../API/TournamentAPI";
 
 export default function DashboardTournament() {
   const navigate = useNavigate();
+  const organizer = canOrganize(); // only organizers/admins see the create menu
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
 
@@ -57,6 +59,7 @@ export default function DashboardTournament() {
             </motion.h1>
 
             {/* + Button */}
+            {organizer && (
             <div className="relative">
               <motion.button
                 onClick={handleDropdownToggle}
@@ -87,6 +90,7 @@ export default function DashboardTournament() {
                 </motion.div>
               )}
             </div>
+            )}
           </div>
 
           {/* Tournament Grid */}

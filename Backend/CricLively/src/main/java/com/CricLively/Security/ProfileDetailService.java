@@ -1,5 +1,6 @@
 package com.CricLively.Security;
 
+import com.CricLively.Entities.Enums.Role;
 import com.CricLively.Entities.Profile;
 import com.CricLively.Repository.ProfileRepository;
 import org.jspecify.annotations.NonNull;
@@ -26,7 +27,7 @@ public class ProfileDetailService implements UserDetailsService {
         Profile profile = this.profileRepository.findByEmail(username).orElseThrow(
                 () -> new UsernameNotFoundException("Email details not found")
         );
-        List<GrantedAuthority> authorities = profile.getRole().stream()
+        List<GrantedAuthority> authorities = (profile.getRole() == null ? List.<Role>of() : profile.getRole()).stream()
                 .map(role -> (GrantedAuthority)
                         new SimpleGrantedAuthority("ROLE_" + role.name()))
                 .toList();

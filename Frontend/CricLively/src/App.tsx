@@ -20,8 +20,14 @@ import GallerySection from "./components/GallerySection";
 import DashboardMatches from "./components/DashboardMatches";
 import ViewerPage from "./components/viewer";
 import Scorer from "./components/Scorer";
+import ProfilePage from "./components/ProfilePage";
+import RequireRole from "./components/RequireRole";
+import type { Role } from "./lib/auth";
 
 const queryClient = new QueryClient();
+
+// who may create tournaments / teams / matches and score
+const ORGANIZERS: Role[] = ["ORGANIZER", "ADMIN"];
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -30,25 +36,44 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* ---------- Anyone ---------- */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
-          <Route path="/showTournaments" element={<TournamentLayout />}>
-            <Route index element={<DashboardTournament />} />
-            <Route path="createTournament" element={<CreateTournament />} />
+
+          {/* ---------- Any logged-in person: player, organizer or admin ---------- */}
+          <Route element={<RequireRole />}>
+            <Route path="/showTournaments" element={<TournamentLayout />}>
+              <Route index element={<DashboardTournament />} />
+              {/* organizer + admin only */}
+              <Route element={<RequireRole roles={ORGANIZERS} />}>
+                <Route path="createTournament" element={<CreateTournament />} />
+              </Route>
+            </Route>
+
+            <Route path="/matchesDashboard" element={<MatchLayout />}>
+              <Route index element={<DashboardMatches />} />
+              {/* organizer + admin only */}
+              <Route element={<RequireRole roles={ORGANIZERS} />}>
+                <Route path="createMatch" element={<CreateMatch />} />
+                <Route path="createTeam" element={<CreateTeam />} />
+              </Route>
+            </Route>
+
+            <Route path="/matches" element={<Matches />} />
+            <Route path="/gallery" element={<GallerySection />} />
+            <Route path="/viewer" element={<ViewerPage />} />
+            <Route path="/stats" element={<Stats />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/player/:playerId" element={<PlayerCricketDetails />} />
+
+            {/* organizer + admin only */}
+            <Route element={<RequireRole roles={ORGANIZERS} />}>
+              <Route path="/scorer" element={<Scorer />} />
+            </Route>
           </Route>
-          <Route path="/matchesDashboard" element={<MatchLayout />}>
-            <Route index element={<DashboardMatches />} />
-            <Route path="createMatch" element={<CreateMatch />} />
-            <Route path="createTeam" element={<CreateTeam />} />
-          </Route>
-          <Route path="/matches" element={<Matches />} />
-          <Route path="/gallery" element={<GallerySection/>} />
-          <Route path="/scorer" element={<Scorer/>} />
-          <Route path="/viewer" element={<ViewerPage/>} />
-          <Route path="/player/:playerId" element={<PlayerCricketDetails />} />
-          <Route path="/stats" element={<Stats />} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

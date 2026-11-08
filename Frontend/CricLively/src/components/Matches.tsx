@@ -1,3 +1,4 @@
+import { canOrganize } from "../lib/auth";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useEffect, useState } from "react";
@@ -11,6 +12,7 @@ type MatchStatus = "LIVE" | "UPCOMING" | "FINISHED" | "ABANDONED";
 
 export default function Matches() {
   const navigate = useNavigate();
+  const organizer = canOrganize(); // only organizers/admins see the create menu
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<MatchStatus>("UPCOMING");
@@ -32,8 +34,8 @@ export default function Matches() {
 
   const handleActionClick = (action: string) => {
     setDropdownOpen(false);
-    if (action === "New Tournament") navigate("/tournament/new");
-    if (action === "New Match") navigate("/match/new");
+    if (action === "New Tournament") navigate("/showTournaments/createTournament");
+    if (action === "New Match") navigate("/matchesDashboard/createMatch");
   };
 
   // Filter matches based on selected button
@@ -57,6 +59,7 @@ export default function Matches() {
             </motion.h1>
 
             {/* + Button */}
+            {organizer && (
             <div className="relative">
               <motion.button
                 onClick={handleDropdownToggle}
@@ -85,6 +88,7 @@ export default function Matches() {
                 </motion.div>
               )}
             </div>
+            )}
           </div>
 
           {/* Status Buttons */}

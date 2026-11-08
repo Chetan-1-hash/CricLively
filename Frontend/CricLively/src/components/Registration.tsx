@@ -9,6 +9,8 @@ import {
 } from "./data/DTO";
 import { registerPlayer } from "../API/RegistrationController";
 import { useNavigate } from "react-router-dom";
+import { login } from "../API/PlayerAPI";
+import { saveSession } from "../lib/auth";
 
 export default function Registration() {
   const [fullName, setFullName] = useState("");
@@ -51,7 +53,9 @@ export default function Registration() {
         description: playerresponse.message,
         duration: 3000,
       });
-      sessionStorage.setItem("playerId", playerresponse.playerId);
+      // log the new person in, so the next page (cricket details) is allowed to save
+      const me = await login({ email, password });
+      saveSession(me);
       setTimeout(() => {
         navigate(`/player/${playerresponse.playerId}`);
       }, 3000);
