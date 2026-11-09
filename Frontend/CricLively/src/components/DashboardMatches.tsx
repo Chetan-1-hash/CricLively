@@ -190,6 +190,17 @@ export default function DashboardMatches() {
                         status={match.matchStatus}
                         time={`${match.date} ${match.time}`}
                         venue={match.venue}
+                        onViewScoreboard={
+                          match.matchStatus === "LIVE" || match.matchStatus === "FINISHED"
+                            ? () => navigate(`/viewer/${match.matchId}`)
+                            : undefined
+                        }
+                        onScore={
+                          organizer && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING")
+                            ? () => navigate(`/scorer/${match.matchId}`)
+                            : undefined
+                        }
+                        scoreLabel={match.matchStatus === "UPCOMING" ? "Start Scoring" : "Score"}
                     />
                     ))
                   ) : (

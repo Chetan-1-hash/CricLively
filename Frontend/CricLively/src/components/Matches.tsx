@@ -141,13 +141,29 @@ export default function Matches() {
                   Venue: {match.venue}
                 </p>
 
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="mt-4 w-full py-2.5 bg-accent text-accent-foreground rounded-full font-semibold"
-                >
-                  View Match
-                </motion.button>
+                <div className="mt-4 flex gap-2">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    disabled={match.matchStatus !== "LIVE" && match.matchStatus !== "FINISHED"}
+                    onClick={() => navigate(`/viewer/${match.matchId}`)}
+                    className="flex-1 py-2.5 bg-accent text-accent-foreground rounded-full font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Scoreboard
+                  </motion.button>
+
+                  {/* only organizers and admins ever see this button */}
+                  {organizer && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING") && (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => navigate(`/scorer/${match.matchId}`)}
+                      className="flex-1 py-2.5 border-2 border-foreground/30 text-foreground rounded-full font-semibold"
+                    >
+                      {match.matchStatus === "UPCOMING" ? "Start Scoring" : "Score"}
+                    </motion.button>
+                  )}
+                </div>
               </motion.div>
             ))}
           </div>

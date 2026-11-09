@@ -63,14 +63,15 @@ const App = () => (
 
             <Route path="/matches" element={<Matches />} />
             <Route path="/gallery" element={<GallerySection />} />
-            <Route path="/viewer" element={<ViewerPage />} />
+            {/* SCOREBOARD: every logged-in person */}
+            <Route path="/viewer/:matchId" element={<ViewerPage />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/player/:playerId" element={<PlayerCricketDetails />} />
 
             {/* organizer + admin only */}
             <Route element={<RequireRole roles={ORGANIZERS} />}>
-              <Route path="/scorer" element={<Scorer />} />
+              <Route path="/scorer/:matchId" element={<Scorer />} />
             </Route>
           </Route>
 

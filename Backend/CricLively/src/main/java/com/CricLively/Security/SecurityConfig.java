@@ -55,10 +55,17 @@ public class SecurityConfig {
                                 "/images/upload").hasAnyRole("ORGANIZER", "ADMIN")
                         .requestMatchers("/profile/getProfileList").hasAnyRole("ORGANIZER", "ADMIN")
 
+                        // SCORER: anything that CHANGES a match (toss, innings, balls, finish, abandon)
+                        .requestMatchers(HttpMethod.POST, "/matches/**").hasAnyRole("ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/matches/**").hasAnyRole("ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/matches/**").hasAnyRole("ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/matches/**").hasAnyRole("ORGANIZER", "ADMIN")
+
                         // ---------- 4. EVERY signed-in person: view + own profile ----------
                         .requestMatchers("/profile/me").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/player/*/playerInfo")
                                 .hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                        // SCOREBOARD: GET /matches/{id}/scoreboard and /balls are covered by "/matches/**" below
                         .requestMatchers(HttpMethod.GET, "/tournaments/**", "/matches/**", "/team/**",
                                 "/gallery/**", "/player/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
 

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 @Service
@@ -151,9 +152,14 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
+    /** Read one match (used by the scoreboard and by the scorer's safety checks). */
+    public Match getScoreboard(String matchId) {
+        return getMatch(matchId);
+    }
+
     private Match getMatch(String matchId) {
         return matchRepository.findById(matchId)
-                .orElseThrow(() -> new RuntimeException("Match not found"));
+                .orElseThrow(() -> new NoSuchElementException("Match not found"));
     }
 
 }

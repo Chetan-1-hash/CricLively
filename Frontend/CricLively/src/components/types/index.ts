@@ -9,6 +9,9 @@ export interface MatchCardProps {
   time?: string;
   venue: string;
   index: number;
+  onViewScoreboard?: () => void; // shown to everyone logged in
+  onScore?: () => void;          // only passed in for organizers/admins
+  scoreLabel?: string;
 }
 
 export interface Scoreboard {

@@ -9,7 +9,10 @@ export default function MatchCard({
   status, 
   time, 
   venue,
-  index 
+  index,
+  onViewScoreboard,
+  onScore,
+  scoreLabel
 }
 : MatchCardProps) {
   return (
@@ -85,6 +88,32 @@ export default function MatchCard({
           {venue}
         </p>
       </div>
+
+      {/* Buttons: Scoreboard for everyone, Score only when the parent passes onScore */}
+      {(onViewScoreboard || onScore) && (
+        <div className="mt-4 flex gap-2">
+          {onViewScoreboard && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onViewScoreboard}
+              className="flex-1 py-2 bg-accent text-accent-foreground rounded-full text-sm font-semibold"
+            >
+              Scoreboard
+            </motion.button>
+          )}
+          {onScore && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onScore}
+              className="flex-1 py-2 border-2 border-foreground/30 rounded-full text-sm font-semibold text-foreground"
+            >
+              {scoreLabel ?? "Score"}
+            </motion.button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
