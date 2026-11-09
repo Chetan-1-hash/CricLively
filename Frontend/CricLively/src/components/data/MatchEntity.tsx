@@ -43,7 +43,7 @@ export class InningsSummaryDTO {
 
 export class MatchResponse {
     matchId!: string;
-    tournamentId!: string;
+    tournamentId?: string | null; // empty for a single match
     venue!: string;
     date!: string;
     time!: string;
@@ -56,12 +56,13 @@ export class MatchResponse {
 }
 
 export class AddMatchDTO {
-    matchId!: string;
-    tournamentId!: string;
+    matchId?: string;
+    tournamentId?: string; // optional: leave empty for a single match
     venue!: string;
     date!: string;
-    time!: string;
+    time?: string;
     teamAId!: string;
     teamBId!: string;
-    matchtype!: MatchType;
+    oversPerInnings!: number;
+    matchType?: MatchType;
 }

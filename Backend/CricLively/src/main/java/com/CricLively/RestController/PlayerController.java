@@ -78,7 +78,7 @@ public class PlayerController {
                     new PlayerRegisterResponse(
                             updatedPlayer.getId(),
                             updatedPlayer.getFirstName(),
-                            "Details added successfully!"
+                            "Details saved successfully!"
                     )
             );
         } catch (UpdateCricketDetailsException e) {

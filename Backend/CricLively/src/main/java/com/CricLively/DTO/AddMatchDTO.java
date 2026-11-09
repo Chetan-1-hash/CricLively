@@ -9,7 +9,8 @@ import java.time.LocalTime;
 @Data
 public class AddMatchDTO {
     private String matchId;
-    private String tournamentId;
+    private String tournamentId;   // optional: leave empty for a single match
+    private String venue;
     private String teamAId;
     private String teamBId;
     private LocalDate date;

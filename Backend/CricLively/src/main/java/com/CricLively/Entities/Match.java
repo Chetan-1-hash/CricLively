@@ -15,7 +15,8 @@ import java.time.LocalTime;
 
     @Id
     private String id;
-    private String tournamentId;
+    private String tournamentId;   // null = a single match that belongs to no tournament
+    private String venue;
     private String teamAId;
     private String teamBId;
     private LocalDate date;

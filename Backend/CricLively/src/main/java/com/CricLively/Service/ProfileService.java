@@ -3,6 +3,7 @@ package com.CricLively.Service;
 import com.CricLively.DTO.MyProfileResponse;
 import com.CricLively.DTO.PlayerRegisterRequest;
 import com.CricLively.DTO.ProfileList;
+import com.CricLively.DTO.UpdateProfileRequest;
 import com.CricLively.Entities.Enums.Role;
 import com.CricLively.Entities.Player;
 import com.CricLively.Entities.Profile;
@@ -16,10 +17,12 @@ import org.springframework.security.access.prepost.PreFilter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -122,7 +125,79 @@ public class ProfileService {
     public MyProfileResponse getMyProfile(String email) {
         Profile profile = profileRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
+        return toResponse(profile);
+    }
 
+    /** ADMIN: one profile by id. */
+    public MyProfileResponse getProfileById(String profileId) {
+        Profile profile = profileRepository.findById(profileId)
+                .orElseThrow(() -> new NoSuchElementException("Profile not found"));
+        return toResponse(profile);
+    }
+
+    /** ADMIN: everybody. */
+    public List<MyProfileResponse> getAllProfiles() {
+        return profileRepository.findAll().stream().map(this::toResponse).toList();
+    }
+
+    /** Any logged-in person edits THEIR OWN info (the profile comes from the login, never from the request). */
+    public MyProfileResponse updateMyInfo(String email, UpdateProfileRequest request) {
+        Profile profile = profileRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+        return applyPersonalInfo(profile, request);
+    }
+
+    /** ADMIN edits anybody's info. */
+    public MyProfileResponse updateInfoById(String profileId, UpdateProfileRequest request) {
+        Profile profile = profileRepository.findById(profileId)
+                .orElseThrow(() -> new NoSuchElementException("Profile not found"));
+        return applyPersonalInfo(profile, request);
+    }
+
+    /** Checks everything first, saves afterwards, so a bad value changes nothing. */
+    private MyProfileResponse applyPersonalInfo(Profile profile, UpdateProfileRequest request) {
+        if (request.getMobileNumber() != null) {
+            String mobile = request.getMobileNumber().trim();
+            if (mobile.isEmpty()) throw new IllegalArgumentException("Mobile number cannot be empty");
+            profileRepository.findByMobileNumber(mobile).ifPresent(other -> {
+                if (!other.getId().equals(profile.getId())) {
+                    throw new IllegalArgumentException("This mobile number is already used by another account");
+                }
+            });
+            profile.setMobileNumber(mobile);
+        }
+
+        Player player = profile.getPlayerId() == null
+                ? null
+                : playerRepository.findById(profile.getPlayerId()).orElse(null);
+
+        if (player != null) {
+            if (request.getFirstName() != null) {
+                String first = request.getFirstName().trim();
+                if (first.isEmpty()) throw new IllegalArgumentException("First name cannot be empty");
+                player.setFirstName(first);
+            }
+            if (request.getMiddleName() != null) player.setMiddleName(blankToNull(request.getMiddleName()));
+            if (request.getLastName() != null) player.setLastName(blankToNull(request.getLastName()));
+            if (request.getDob() != null) {
+                if (request.getDob().isAfter(LocalDate.now())) {
+                    throw new IllegalArgumentException("Date of birth cannot be in the future");
+                }
+                player.setDob(request.getDob());
+            }
+            playerRepository.save(player);
+        }
+
+        profileRepository.save(profile);
+        return toResponse(profile);
+    }
+
+    private static String blankToNull(String s) {
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private MyProfileResponse toResponse(Profile profile) {
         Player player = profile.getPlayerId() == null
                 ? null
                 : playerRepository.findById(profile.getPlayerId()).orElse(null);

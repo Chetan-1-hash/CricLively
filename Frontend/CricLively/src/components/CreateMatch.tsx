@@ -8,118 +8,128 @@ import type { TournamentResponse } from "./data/TournamentEntity";
 import { TeamsListAPI } from "../API/TeamsAPI";
 import type { TeamsList } from "./data/DTO";
 import { addMatch } from "../API/MatchApi";
-import { AddMatchDTO, type MatchType } from "./data/MatchEntity";
+import type { AddMatchDTO, MatchType } from "./data/MatchEntity";
 
+const MATCH_TYPES: MatchType[] = [
+  "LEAGUE", "GROUP", "ROUND_ROBIN",
+  "PRE_QUARTER_FINAL", "QUARTER_FINAL", "SEMI_FINAL", "ELIMINATOR", "QUALIFIER", "PLAYOFF",
+  "THIRD_PLACE", "FINAL", "GRAND_FINAL",
+  "DECIDER", "SUPER_OVER", "REPLAY",
+  "FRIENDLY", "EXHIBITION", "PRACTICE", "WARM_UP",
+];
+
+const formatLabel = (value: string) =>
+  value
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+const inputCls = "w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm";
+
+/**
+ * Create a match.
+ *  - Opened from a tournament  -> that tournament is already selected.
+ *  - Opened from anywhere else -> "No tournament" is selected, so it is a standalone match.
+ */
 export default function CreateMatch() {
   const location = useLocation();
   const navigate = useNavigate();
-  const tournamentId = location.state;
-  const [tournamentName, setTournamentName] = useState("");
+
+  // location.state is null when we did not come from a tournament - that is fine now.
+  const presetTournamentId =
+    (location.state as { tournamentId?: string } | null)?.tournamentId ?? "";
+
+  const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamsList[]>([]);
+  const [saving, setSaving] = useState(false);
   const [matchDTO, setMatchDTO] = useState<AddMatchDTO>({
+    tournamentId: presetTournamentId,
     teamAId: "",
     teamBId: "",
-    matchId: "",
-    tournamentId: tournamentId.tournamentId ?? "",
     venue: "",
     date: "",
     time: "",
-    matchtype: undefined as unknown as MatchType,
+    oversPerInnings: 20,
+    matchType: presetTournamentId ? "LEAGUE" : "FRIENDLY",
   });
-  const [teamList, setTeamList] = useState<TeamsList[]>([]);
-
-  const matchTypes = [
-    "LEAGUE",
-    "GROUP",
-    "ROUND_ROBIN",
-
-    "PRE_QUARTER_FINAL",
-    "QUARTER_FINAL",
-    "SEMI_FINAL",
-    "ELIMINATOR",
-    "QUALIFIER",
-    "PLAYOFF",
-
-    "THIRD_PLACE",
-    "FINAL",
-    "GRAND_FINAL",
-
-    "DECIDER",
-    "SUPER_OVER",
-    "REPLAY",
-
-    "FRIENDLY",
-    "EXHIBITION",
-    "PRACTICE",
-    "WARM_UP",
-  ];
-
-  const formatLabel = (value: string) => {
-    return value
-      .toLowerCase()
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
 
   useEffect(() => {
-    fetchTournamentName();
-    checkTeamAvailiability();
+    TournamentListAPI()
+      .then((list) => {
+        setTournaments(list);
+        const preset = list.find((t) => String(t.id) === presetTournamentId);
+        if (preset) setMatchDTO((m) => ({ ...m, venue: m.venue || preset.venue }));
+      })
+      .catch(() =>
+        toast({ title: "Could not load tournaments", variant: "destructive" })
+      );
+
+    TeamsListAPI()
+      .then(setAllTeams)
+      .catch(() => toast({ title: "Could not load teams", variant: "destructive" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchTournamentName = async () => {
-    try {
-      const resp: TournamentResponse[] = await TournamentListAPI();
-      const filteredTournament = resp.find(
-        (t) => String(t.id) === tournamentId.tournamentId
-      );
-      if (filteredTournament) {
-        setTournamentName(filteredTournament.name);
-        setMatchDTO((t) => ({ ...t, venue: filteredTournament.venue }));
-      } else {
-        toast({
-          title: "Tournament Not Found!",
-          variant: "destructive",
-          description: "Invalid tournament data",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Tournament Name Error!",
-        variant: "destructive",
-        description: "Error while fetching name.",
-      });
-    }
+  const tournamentName = (id: string) => tournaments.find((t) => String(t.id) === id)?.name;
+
+  // With a tournament: only its teams. Standalone: every team.
+  const teamList = matchDTO.tournamentId
+    ? allTeams.filter((t) => t.tournamentId === matchDTO.tournamentId)
+    : allTeams;
+
+  const onTournamentChange = (id: string) => {
+    const picked = tournaments.find((t) => String(t.id) === id);
+    setMatchDTO((m) => ({
+      ...m,
+      tournamentId: id,
+      teamAId: "", // old team choices may not belong to the new tournament
+      teamBId: "",
+      venue: picked ? picked.venue : m.venue,
+      matchType: id ? m.matchType : "FRIENDLY",
+    }));
   };
 
-  const checkTeamAvailiability = async () => {
-    const response = await TeamsListAPI();
-    const id = tournamentId?.tournamentId;
-    const filterTeams = response.filter((t) => t.tournamentId === id);
-    setTeamList(filterTeams);
+  const validate = (): string | null => {
+    if (!matchDTO.teamAId || !matchDTO.teamBId) return "Select both teams.";
+    if (matchDTO.teamAId === matchDTO.teamBId) return "Team 1 and Team 2 must be different.";
+    if (!matchDTO.date) return "Select the match date.";
+    if (!matchDTO.venue.trim()) return "Enter the venue.";
+    const overs = Number(matchDTO.oversPerInnings);
+    if (!Number.isInteger(overs) || overs < 1 || overs > 50) {
+      return "Overs per innings must be a whole number from 1 to 50.";
+    }
+    return null;
   };
 
   const addNewMatch = async () => {
+    if (saving) return;
+    const problem = validate();
+    if (problem) {
+      toast({ title: "Check the form", description: problem, variant: "destructive" });
+      return;
+    }
+
+    setSaving(true);
     try {
-      const response = await addMatch(matchDTO);
-
-      toast({
-        title: "Match created successfully",
-        description: "The match has been added.",
+      await addMatch({
+        ...matchDTO,
+        tournamentId: matchDTO.tournamentId || undefined, // empty = standalone match
+        venue: matchDTO.venue.trim(),
+        time: matchDTO.time || undefined,
+        oversPerInnings: Number(matchDTO.oversPerInnings),
       });
-      setTimeout(() => {
-        navigate("/matchesDashboard");
-      }, 2000);
-      return response;
-    } catch (e: unknown) {
-      const err = e as any;
 
-      console.error("Add match failed:", err?.response?.data || err);
-
+      toast({ title: "Match created successfully", description: "The match has been added." });
+      setTimeout(() => navigate("/matchesDashboard"), 1500);
+    } catch (e) {
       toast({
         title: "Failed to create match",
-        description: err?.response?.data || "Failed",
+        description: (e as Error).message || "Failed",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -127,7 +137,7 @@ export default function CreateMatch() {
     <>
       <Navbar />
 
-      <section className="min-h-screen pt-28 flex justify-center px-4">
+      <section className="min-h-screen pt-28 pb-12 flex justify-center px-4">
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,119 +146,120 @@ export default function CreateMatch() {
         >
           <h1 className="text-3xl font-bold text-center mb-10">Create Match</h1>
 
-          {/* FORM */}
           <div className="space-y-6">
-            {/* TOURNAMENT */}
-            <input
-              disabled={tournamentName.trim() !== ""}
-              value={tournamentName}
-              onChange={(e) => setTournamentName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
-            />
-
-            {/* TEAMS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* TOURNAMENT (optional) */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Tournament (optional)</label>
               <select
-                value={matchDTO?.teamAId}
-                onChange={(e) =>
-                  setMatchDTO((t) => ({ ...t, teamAId: e.target.value }))
-                }
-                className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
+                value={matchDTO.tournamentId ?? ""}
+                onChange={(e) => onTournamentChange(e.target.value)}
+                className={inputCls}
               >
-                <option value="">Select Team 1</option>
-
-                {teamList.map((team) => (
-                  <option
-                    key={team.id}
-                    value={team.id}
-                    disabled={team.id === matchDTO?.teamBId}
-                  >
-                    {team.teamName}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={matchDTO?.teamBId}
-                onChange={(e) =>
-                  setMatchDTO((t) => ({ ...t, teamBId: e.target.value }))
-                }
-                className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
-              >
-                <option value="">Select Team 2</option>
-
-                {teamList.map((team) => (
-                  <option
-                    key={team.id}
-                    value={team.id}
-                    disabled={team.id === matchDTO?.teamAId}
-                  >
-                    {team.teamName}
+                <option value="">No tournament - single match</option>
+                {tournaments.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* TEAMS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(["teamAId", "teamBId"] as const).map((key, i) => {
+                const other = key === "teamAId" ? matchDTO.teamBId : matchDTO.teamAId;
+                return (
+                  <select
+                    key={key}
+                    value={matchDTO[key]}
+                    onChange={(e) => setMatchDTO((m) => ({ ...m, [key]: e.target.value }))}
+                    className={inputCls}
+                  >
+                    <option value="">Select Team {i + 1}</option>
+                    {teamList.map((team) => {
+                      const from = !matchDTO.tournamentId ? tournamentName(team.tournamentId) : undefined;
+                      return (
+                        <option key={team.id} value={team.id} disabled={team.id === other}>
+                          {team.teamName}
+                          {from ? ` (${from})` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                );
+              })}
+            </div>
+            {teamList.length === 0 && (
+              <p className="text-xs text-foreground/60">
+                No teams found{matchDTO.tournamentId ? " for this tournament" : ""}. Create teams first.
+              </p>
+            )}
+
             {/* DATE & TIME */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
                 type="date"
-                value={matchDTO?.date}
-                onChange={(e) =>
-                  setMatchDTO((t) => ({ ...t, date: e.target.value }))
-                }
-                className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
+                value={matchDTO.date}
+                onChange={(e) => setMatchDTO((m) => ({ ...m, date: e.target.value }))}
+                className={inputCls}
               />
-
               <input
                 type="time"
-                value={matchDTO?.time}
-                onChange={(e) =>
-                  setMatchDTO((t) => ({ ...t, time: e.target.value }))
-                }
-                className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
+                value={matchDTO.time}
+                onChange={(e) => setMatchDTO((m) => ({ ...m, time: e.target.value }))}
+                className={inputCls}
               />
             </div>
 
             {/* VENUE & TYPE */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
-                disabled
                 placeholder="Venue"
-                value={matchDTO?.venue}
-                className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
+                value={matchDTO.venue}
+                onChange={(e) => setMatchDTO((m) => ({ ...m, venue: e.target.value }))}
+                className={inputCls}
               />
 
               <select
-                value={matchDTO.matchtype ?? ""}
+                value={matchDTO.matchType ?? ""}
                 onChange={(e) =>
-                  setMatchDTO((t) => ({
-                    ...t,
-                    matchtype: e.target.value as MatchType,
-                  }))
+                  setMatchDTO((m) => ({ ...m, matchType: e.target.value as MatchType }))
                 }
-                className="w-full px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
+                className={inputCls}
               >
-                <option value="" disabled>
-                  Match Type
-                </option>
-
-                {matchTypes.map((type) => (
+                {MATCH_TYPES.map((type) => (
                   <option key={type} value={type}>
                     {formatLabel(type)}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* OVERS */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Overs per innings</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={matchDTO.oversPerInnings}
+                onChange={(e) =>
+                  setMatchDTO((m) => ({ ...m, oversPerInnings: Number(e.target.value) }))
+                }
+                className={inputCls}
+              />
+            </div>
           </div>
 
           {/* SUBMIT */}
           <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            className="w-full mt-10 py-3 bg-primary text-primary-foreground rounded-full font-semibold shadow-lg"
+            whileHover={{ scale: saving ? 1 : 1.03 }}
+            whileTap={{ scale: saving ? 1 : 0.97 }}
+            disabled={saving}
+            className="w-full mt-10 py-3 bg-primary text-primary-foreground rounded-full font-semibold shadow-lg disabled:opacity-70"
             onClick={addNewMatch}
           >
-            Create Match
+            {saving ? "Creating..." : "Create Match"}
           </motion.button>
         </motion.div>
       </section>

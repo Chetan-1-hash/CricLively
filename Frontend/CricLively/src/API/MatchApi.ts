@@ -39,7 +39,8 @@ export async function addMatch(addMatch: AddMatchDTO):Promise<boolean>{
     })
 
     if (!response.ok) {
-        throw new Error("Failed to create matches");
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? "Failed to create match");
     }
     return response.json();
 }

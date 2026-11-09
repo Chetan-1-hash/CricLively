@@ -48,7 +48,7 @@ export default function RequireRole({ roles }: { roles?: Role[] }) {
     if (denied) {
       toast({
         title: "No access",
-        description: "Only organizers and admins can open that page.",
+        description: "You do not have access to that page.",
         variant: "destructive",
         duration: 3000,
       });

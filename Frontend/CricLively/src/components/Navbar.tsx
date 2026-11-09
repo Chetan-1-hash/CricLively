@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate, NavLink } from "react-router-dom";
 import ImageController from "../API/ImageController";
 import { logout } from "../API/PlayerAPI";
-import { clearSession, getSession } from "../lib/auth";
+import { clearSession, getSession, isAdmin } from "../lib/auth";
 
 const authNavItems = [
   { name: "Home", to: "/" },
@@ -164,6 +164,19 @@ export default function Navbar() {
                     >
                       Manage Profile
                     </button>
+
+                    {/* admin only */}
+                    {isAdmin() && (
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          navigate("/admin/users");
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-red-600 hover:text-white transition"
+                      >
+                        Manage Users
+                      </button>
+                    )}
 
                     <button
                       onClick={handleLogout}

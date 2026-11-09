@@ -3,6 +3,7 @@ package com.CricLively.RestController;
 import com.CricLively.DTO.LoginRequest;
 import com.CricLively.DTO.MyProfileResponse;
 import com.CricLively.DTO.ProfileList;
+import com.CricLively.DTO.UpdateProfileRequest;
 import com.CricLively.Service.ProfileService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -77,6 +78,16 @@ public class ProfileController {
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication auth) {
         return ResponseEntity.ok(profileService.getMyProfile(auth.getName()));
+    }
+
+    /** A person edits THEIR OWN profile. There is no id in the URL on purpose: it is always "me". */
+    @PutMapping("/me")
+    public ResponseEntity<?> updateMe(@RequestBody UpdateProfileRequest request, Authentication auth) {
+        try {
+            return ResponseEntity.ok(profileService.updateMyInfo(auth.getName(), request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/logout")

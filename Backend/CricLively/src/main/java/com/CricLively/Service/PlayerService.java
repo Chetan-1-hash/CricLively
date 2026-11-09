@@ -30,13 +30,10 @@ public class PlayerService {
     public Player updateCricketDetails(String playerId, PlayerCricketDetailsRequest details, MultipartFile imageFile) throws UpdateCricketDetailsException {
         Player player = getPlayer(playerId);
 
-        if(this.playerRepository.existsByIdAndCricketDetailsCompleted(playerId,true)){
-            throw new UpdateCricketDetailsException("Player details already exists");
-        }
-
-        player.setBattingStyle(details.getBattingStyle());
-        player.setBowlingStyle(details.getBowlingStyle());
-        player.setPlayingRole(details.getPlayingRole());
+        // Details can be changed again later. Only the fields that were sent are overwritten.
+        if (details.getBattingStyle() != null) player.setBattingStyle(details.getBattingStyle());
+        if (details.getBowlingStyle() != null) player.setBowlingStyle(details.getBowlingStyle());
+        if (details.getPlayingRole() != null) player.setPlayingRole(details.getPlayingRole());
         if(imageFile != null && !imageFile.isEmpty()) {
                 String imageId = imageStorageService.store(imageFile);
                 player.setImage(imageId);

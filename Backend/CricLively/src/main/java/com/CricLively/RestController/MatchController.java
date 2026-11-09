@@ -42,6 +42,10 @@ public class MatchController {
                     )
             );
         }
+        catch (IllegalArgumentException e) {
+            // a mistake in the form: show the message as it is
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
         catch(Exception e){
             System.out.println(e.getMessage());
             return ResponseEntity

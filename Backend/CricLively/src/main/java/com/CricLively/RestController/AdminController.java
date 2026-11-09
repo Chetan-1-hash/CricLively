@@ -1,5 +1,7 @@
 package com.CricLively.RestController;
 
+import com.CricLively.DTO.MyProfileResponse;
+import com.CricLively.DTO.UpdateProfileRequest;
 import com.CricLively.DTO.UpdateRolesRequest;
 import com.CricLively.Entities.Enums.Role;
 import com.CricLively.Entities.Profile;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * Admin-only tools (SecurityConfig blocks everyone else from /admin/**).
@@ -22,6 +25,34 @@ import java.util.Map;
 public class AdminController {
 
     private final ProfileService profileService;
+
+    /** Every profile (admin only). */
+    @GetMapping("/profiles")
+    public List<MyProfileResponse> allProfiles() {
+        return profileService.getAllProfiles();
+    }
+
+    @GetMapping("/profiles/{profileId}")
+    public ResponseEntity<?> oneProfile(@PathVariable String profileId) {
+        try {
+            return ResponseEntity.ok(profileService.getProfileById(profileId));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Edit anybody's name, date of birth and mobile number. (Cricket details: PUT /player/{playerId}/playerInfo) */
+    @PutMapping("/profiles/{profileId}")
+    public ResponseEntity<?> updateProfile(@PathVariable String profileId,
+                                           @RequestBody UpdateProfileRequest request) {
+        try {
+            return ResponseEntity.ok(profileService.updateInfoById(profileId, request));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
 
     /**
      * Decide what a person is allowed to do.

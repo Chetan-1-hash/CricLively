@@ -4,6 +4,7 @@ import com.CricLively.DTO.AddMatchDTO;
 import com.CricLively.DTO.MatchDashboardDTO;
 import com.CricLively.Entities.*;
 import com.CricLively.Entities.Enums.MatchStatus;
+import com.CricLively.Entities.Enums.MatchType;
 import com.CricLively.Repository.MatchRepository;
 import com.CricLively.Repository.TeamRepository;
 import com.CricLively.Repository.TournamentRepository;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
@@ -22,19 +24,20 @@ public class MatchService {
     private final TournamentRepository tournamentRepository;
     private final TeamRepository teamRepository;
 
+    /** Every match - tournament matches AND single (tournament-less) matches. */
     public List<MatchDashboardDTO> getAllMatches() {
-        return tournamentRepository.findAll()
-                .stream()
-                .flatMap(tournament ->
-                        matchRepository.findByTournamentId(tournament.getId())
-                                .stream()
-                                .map(match -> {
-                                    Team teamA = teamRepository.findTeamNameById(match.getTeamAId());
-                                    Team teamB = teamRepository.findTeamNameById(match.getTeamBId());
+        Map<String, Tournament> tournaments = tournamentRepository.findAll().stream()
+                .collect(Collectors.toMap(Tournament::getId, t -> t, (a, b) -> a));
 
-                                    return convertToDashboardDTO(match, tournament, teamA, teamB);
-                                })
-                )
+        return matchRepository.findAll().stream()
+                .map(match -> {
+                    Tournament tournament = match.getTournamentId() == null
+                            ? null
+                            : tournaments.get(match.getTournamentId());
+                    Team teamA = teamRepository.findTeamNameById(match.getTeamAId());
+                    Team teamB = teamRepository.findTeamNameById(match.getTeamBId());
+                    return convertToDashboardDTO(match, tournament, teamA, teamB);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -61,8 +64,10 @@ public class MatchService {
         String teamBName = teamB != null ? teamB.getTeamName() : "Unknown team";
         MatchDashboardDTO.MatchDashboardDTOBuilder builder = MatchDashboardDTO.builder()
                 .matchId(match.getId())
-                .tournamentId(tournament.getId())
-                .venue(tournament.getVenue())
+                .tournamentId(tournament != null ? tournament.getId() : null) // null = single match
+                .venue(match.getVenue() != null && !match.getVenue().isBlank()
+                        ? match.getVenue()
+                        : (tournament != null ? tournament.getVenue() : null))
                 .date(match.getDate())
                 .time(match.getTime())
                 .teamAName(teamAName)
@@ -93,17 +98,51 @@ public class MatchService {
                 .build();
     }
 
-    public void addMatch(AddMatchDTO addmatchdto) {
-        Match match = new Match();
+    public void addMatch(AddMatchDTO dto) {
+        // tournament is OPTIONAL
+        String tournamentId = dto.getTournamentId() == null || dto.getTournamentId().isBlank()
+                ? null : dto.getTournamentId().trim();
+        Tournament tournament = null;
+        if (tournamentId != null) {
+            tournament = tournamentRepository.findTournamentById(tournamentId);
+            if (tournament == null) throw new IllegalArgumentException("Tournament not found");
+        }
 
-//        match.setId(addmatchdto.getMatchId());
-        match.setTournamentId(addmatchdto.getTournamentId());
-        match.setTeamAId(addmatchdto.getTeamAId());
-        match.setTeamBId(addmatchdto.getTeamBId());
-        match.setDate(addmatchdto.getDate());
-        match.setTime(addmatchdto.getTime());
-        match.setOversPerInnings(addmatchdto.getOversPerInnings());
-        match.setMatchType(addmatchdto.getMatchType());
+        if (isBlank(dto.getTeamAId()) || isBlank(dto.getTeamBId())) {
+            throw new IllegalArgumentException("Select both teams");
+        }
+        if (dto.getTeamAId().equals(dto.getTeamBId())) {
+            throw new IllegalArgumentException("Team 1 and Team 2 must be different");
+        }
+        Team teamA = teamRepository.findById(dto.getTeamAId())
+                .orElseThrow(() -> new IllegalArgumentException("Team 1 not found"));
+        Team teamB = teamRepository.findById(dto.getTeamBId())
+                .orElseThrow(() -> new IllegalArgumentException("Team 2 not found"));
+        if (tournamentId != null
+                && (!tournamentId.equals(teamA.getTournamentId()) || !tournamentId.equals(teamB.getTournamentId()))) {
+            throw new IllegalArgumentException("Both teams must belong to the selected tournament");
+        }
+
+        if (dto.getDate() == null) throw new IllegalArgumentException("Match date is required");
+
+        Integer overs = dto.getOversPerInnings();
+        if (overs == null || overs < 1 || overs > 50) {
+            throw new IllegalArgumentException("Overs per innings must be between 1 and 50");
+        }
+
+        String venue = isBlank(dto.getVenue()) ? null : dto.getVenue().trim();
+        if (venue == null && tournament != null) venue = tournament.getVenue();
+        if (venue == null) throw new IllegalArgumentException("Venue is required");
+
+        Match match = new Match();
+        match.setTournamentId(tournamentId);
+        match.setVenue(venue);
+        match.setTeamAId(dto.getTeamAId());
+        match.setTeamBId(dto.getTeamBId());
+        match.setDate(dto.getDate());
+        match.setTime(dto.getTime());
+        match.setOversPerInnings(overs);
+        match.setMatchType(dto.getMatchType() != null ? dto.getMatchType() : MatchType.FRIENDLY);
         match.setMatchStatus(MatchStatus.UPCOMING);
 
         // initial state
@@ -112,6 +151,10 @@ public class MatchService {
         match.setInnings2(null);
 
         matchRepository.save(match);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     // START MATCH (LIVE)

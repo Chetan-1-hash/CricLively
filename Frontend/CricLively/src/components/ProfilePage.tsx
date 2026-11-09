@@ -113,6 +113,16 @@ export default function ProfilePage() {
                   )}
                 </>
               )}
+
+              {/* You can edit YOUR OWN profile. (Admins edit other people in Manage Users.) */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate("/profile/edit")}
+                className="w-full mt-6 py-3 border-2 border-primary text-foreground rounded-full font-semibold"
+              >
+                Edit profile
+              </motion.button>
             </>
           )}
         </motion.div>

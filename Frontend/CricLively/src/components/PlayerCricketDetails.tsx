@@ -173,7 +173,7 @@ export default function PlayerCricketDetails() {
                 <option value="Left_ArmMedium">Left Arm Medium</option>
                 <option value="Right_ArmOffBreak">Right Arm Off Break</option>
                 <option value="Right_ArmLegBreak">Right Arm Leg Break</option>
-                <option value="Left_ArmOrthodox">Left Arm Orthodox</option>
+                <option value="Orthodox">Orthodox</option>
               </select>
             </div>
 

@@ -22,6 +22,8 @@ import ViewerPage from "./components/viewer";
 import Scorer from "./components/Scorer";
 import ProfilePage from "./components/ProfilePage";
 import RequireRole from "./components/RequireRole";
+import ProfileEditForm from "./components/ProfileEditForm";
+import AdminProfiles from "./components/AdminProfiles";
 import type { Role } from "./lib/auth";
 
 const queryClient = new QueryClient();
@@ -67,7 +69,14 @@ const App = () => (
             <Route path="/viewer/:matchId" element={<ViewerPage />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/edit" element={<ProfileEditForm mode="self" />} />
             <Route path="/player/:playerId" element={<PlayerCricketDetails />} />
+
+            {/* admin only: manage everybody's profile */}
+            <Route element={<RequireRole roles={["ADMIN"]} />}>
+              <Route path="/admin/users" element={<AdminProfiles />} />
+              <Route path="/admin/users/:profileId" element={<ProfileEditForm mode="admin" />} />
+            </Route>
 
             {/* organizer + admin only */}
             <Route element={<RequireRole roles={ORGANIZERS} />}>
