@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "../hooks/use-toast";
-import { fetchMatchScore } from "./data/MatchScoreAPI";
+import { getScoreboard } from "../API/ScoringAPI";
+import { buildScoreState } from "../lib/scoreAdapter";
 import type { MatchScoreState } from "./data/MatchScoringTypes";
 import Navbar from "./Navbar";
 
@@ -17,19 +18,25 @@ export default function ViewerPage() {
 
   useEffect(() => {
     loadScore();
+    // keep the score fresh while someone is watching
+    const timer = setInterval(() => loadScore(true), 10000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId]);
 
-  const loadScore = async () => {
+  const loadScore = async (silent = false) => {
+    if (!matchId) return;
     try {
-      setLoading(true);
-      const data = await fetchMatchScore(matchId ?? "mock-match-1");
-      setState(data);
+      const data = await getScoreboard(matchId);
+      setState(buildScoreState(data));
     } catch (error) {
-      toast({
-        title: "Scoreboard Error!",
-        variant: "destructive",
-        description: "Could not load live score.",
-      });
+      if (!silent) {
+        toast({
+          title: "Scoreboard Error!",
+          variant: "destructive",
+          description: (error as Error).message || "Could not load live score.",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -43,8 +50,40 @@ export default function ViewerPage() {
     );
   }
 
+  // nothing to show before the toss / first ball
+  if (state.innings.length === 0) {
+    return (
+      <>
+        <Navbar />
+        <section className="min-h-[100vh] flex flex-col items-center justify-center gap-4 bg-background/80 px-6 text-center">
+          <h1 className="text-3xl font-extrabold text-foreground">
+            {state.teamAName} <span className="text-foreground/50">vs</span> {state.teamBName}
+          </h1>
+          <p className="text-foreground/70">The match has not started yet. The scoreboard fills in once scoring begins.</p>
+          <button
+            onClick={() => navigate(-1)}
+            className="px-5 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold"
+          >
+            Back
+          </button>
+        </section>
+      </>
+    );
+  }
+
   const innings = state.innings[state.currentInningsIndex];
   const firstInnings = state.innings[0];
+  const secondInnings = state.innings[1];
+  let resultText: string | null = null;
+  if (state.status === "FINISHED" && secondInnings) {
+    if (secondInnings.totalRuns > firstInnings.totalRuns) {
+      resultText = `${secondInnings.battingTeam} won by ${Math.max(10 - secondInnings.totalWickets, 0)} wickets`;
+    } else if (secondInnings.totalRuns < firstInnings.totalRuns) {
+      resultText = `${firstInnings.battingTeam} won by ${firstInnings.totalRuns - secondInnings.totalRuns} runs`;
+    } else {
+      resultText = "Match tied";
+    }
+  }
   const overDisplay = `${innings.totalOvers}.${innings.ballsInCurrentOver}`;
   const striker = innings.batsmen[innings.strikerId];
   const nonStriker = innings.batsmen[innings.nonStrikerId];
@@ -114,6 +153,12 @@ export default function ViewerPage() {
               </p>
             </div>
           </div>
+
+          {resultText && (
+            <div className="rounded-xl bg-green-600/20 px-4 py-3 mb-4">
+              <p className="text-sm font-bold text-foreground">{resultText}</p>
+            </div>
+          )}
 
           {innings.target && (
             <div className="rounded-xl bg-accent/20 px-4 py-3 mb-4">

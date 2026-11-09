@@ -1,7 +1,8 @@
+import { API_URL } from "./client";
 import type { PlayerRegisterRequest, PlayerRegisterResponse } from "../components/data/DTO";
 
 export async function registerPlayer(payload: PlayerRegisterRequest): Promise<PlayerRegisterResponse> {
-  const response = await fetch("http://localhost:8080/player/register", {
+  const response = await fetch(`${API_URL}/player/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

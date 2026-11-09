@@ -1,3 +1,4 @@
+import { API_URL } from "./client";
 import type { AddTournamentRequest } from "../components/data/DTO";
 import type { TournamentResponse } from "../components/data/TournamentEntity";
 
@@ -27,7 +28,7 @@ export async function AddTournamentAPI(tournament: AddTournamentRequest) {
     formData.append("coverImage", tournament.coverImage);
   }
 
-  const resp = await fetch("http://localhost:8080/tournaments", {
+  const resp = await fetch(`${API_URL}/tournaments`, {
     method: "POST",
     credentials: "include",
     body: formData,
@@ -43,7 +44,7 @@ export async function AddTournamentAPI(tournament: AddTournamentRequest) {
 
 
 export default async function TournamentListAPI(): Promise<TournamentResponse[]> {
-  const resp = await fetch("http://localhost:8080/tournaments",{
+  const resp = await fetch(`${API_URL}/tournaments`,{
     method:"GET",
     credentials:"include",
     headers: {
@@ -61,14 +62,14 @@ export default async function TournamentListAPI(): Promise<TournamentResponse[]>
   // Map each tournament to include the full image URL
   const tournamentsWithImageUrl = tournaments.map(t => ({
     ...t,
-    coverImage: `http://localhost:8080/images/${t.coverImage}`
+    coverImage: `${API_URL}/images/${t.coverImage}`
   }));
 
   return tournamentsWithImageUrl;
 }
 
 export async function ExistByVenueAPI(): Promise<string[]>{
-  const response = await fetch(`http://localhost:8080/tournaments/venue-exists`,{
+  const response = await fetch(`${API_URL}/tournaments/venue-exists`,{
     method: "GET",
     credentials: "include"
   })

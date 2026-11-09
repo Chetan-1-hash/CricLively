@@ -1,4 +1,5 @@
 import { canOrganize } from "../lib/auth";
+import { openScoreboard, openScorer } from "../lib/matchAccess";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useEffect, useState } from "react";
@@ -145,19 +146,18 @@ export default function Matches() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    disabled={match.matchStatus !== "LIVE" && match.matchStatus !== "FINISHED"}
-                    onClick={() => navigate(`/viewer/${match.matchId}`)}
-                    className="flex-1 py-2.5 bg-accent text-accent-foreground rounded-full font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => openScoreboard(match, navigate)}
+                    className="flex-1 py-2.5 bg-accent text-accent-foreground rounded-full font-semibold"
                   >
                     Scoreboard
                   </motion.button>
 
-                  {/* only organizers and admins ever see this button */}
-                  {organizer && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING") && (
+                  {/* everybody sees it; a player who clicks gets a message saying why not */}
+                  {(match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING") && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => navigate(`/scorer/${match.matchId}`)}
+                      onClick={() => openScorer(match, navigate)}
                       className="flex-1 py-2.5 border-2 border-foreground/30 text-foreground rounded-full font-semibold"
                     >
                       {match.matchStatus === "UPCOMING" ? "Start Scoring" : "Score"}

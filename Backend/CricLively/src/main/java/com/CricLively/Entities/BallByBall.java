@@ -22,4 +22,6 @@ public class BallByBall {
     private Integer runsExtra;
     private String extraType; // Wide, NoBall, etc.
     private Wicket wicket; // Null if no wicket
+    private String newBatsmanId; // who came in after a wicket on this ball
+    private Long seq;            // 1, 2, 3... order of the balls inside an innings
 }

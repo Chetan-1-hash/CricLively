@@ -1,22 +1,65 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "../hooks/use-toast";
-import { fetchMatchScore, fetchPlayersForTeam, pushBallEvent } from "./data/MatchScoreAPI";
-import type { ExtraType, MatchScoreState, WicketType } from "./data/MatchScoringTypes";
+import {
+  finishMatch,
+  getScoreboard,
+  postBall,
+  undoLastBall,
+  type ScoreboardResponse,
+} from "../API/ScoringAPI";
+import { buildScoreState, toApiBall } from "../lib/scoreAdapter";
+import type { ExtraType, WicketType } from "./data/MatchScoringTypes";
 import { scoringReducer } from "./data/scoringReducer";
 import Navbar from "./Navbar";
+import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
 
 const WICKET_TYPES: WicketType[] = ["Bowled", "Caught", "LBW", "Run Out", "Stumped", "Hit Wicket", "Retired Hurt"];
 const EXTRA_TYPES: ExtraType[] = ["None", "Wide", "No Ball", "Bye", "Leg Bye"];
 const RUN_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
+// Page frame used by the set-up screens (toss, innings, finish)
+function Shell({ title, subtitle, onExit, children }: {
+  title: string;
+  subtitle?: string;
+  onExit: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <Navbar />
+      <section className="min-h-[100vh] py-12 bg-background/80">
+        <div className="container my-8 mx-auto px-6 max-w-3xl">
+          <div className="flex justify-between items-center mb-8 gap-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">{title}</h1>
+              {subtitle && <p className="text-sm text-foreground/70 mt-1">{subtitle}</p>}
+            </div>
+            <button
+              onClick={onExit}
+              className="px-4 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold hover:bg-card transition-colors"
+            >
+              Exit
+            </button>
+          </div>
+          {children}
+        </div>
+      </section>
+    </>
+  );
+}
+
 export default function Scorer() {
   const navigate = useNavigate();
   const { matchId } = useParams();
 
-  const [state, setState] = useState<MatchScoreState | null>(null);
+  // The server is the source of truth. `sb` is what it told us last.
+  const [sb, setSb] = useState<ScoreboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  // a bowler chosen on screen; it is saved together with the next ball
+  const [bowlerOverride, setBowlerOverride] = useState<{ id: string; name: string } | null>(null);
 
   // Pending ball builder
   const [selectedRuns, setSelectedRuns] = useState(0);
@@ -25,46 +68,37 @@ export default function Scorer() {
   const [isWicket, setIsWicket] = useState(false);
   const [wicketType, setWicketType] = useState<WicketType>("Bowled");
   const [showNewBatsmanPicker, setShowNewBatsmanPicker] = useState(false);
-  const [availableBatsmen, setAvailableBatsmen] = useState<{ id: string; name: string }[]>([]);
   const [pendingOutPlayerId, setPendingOutPlayerId] = useState<string | null>(null);
-
   const [showBowlerPicker, setShowBowlerPicker] = useState(false);
-  const [availableBowlers, setAvailableBowlers] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    loadMatch();
-  }, [matchId]);
-
-  const loadMatch = async () => {
+  const load = useCallback(async () => {
+    if (!matchId) return;
     try {
-      setLoading(true);
-      const data = await fetchMatchScore(matchId ?? "mock-match-1");
-      setState(data);
-      const battingTeam = data.innings[data.currentInningsIndex].battingTeam;
-      const bowlingTeam = data.innings[data.currentInningsIndex].bowlingTeam;
-      const [battingPlayers, bowlingPlayers] = await Promise.all([
-        fetchPlayersForTeam(battingTeam),
-        fetchPlayersForTeam(bowlingTeam),
-      ]);
-      setAvailableBatsmen(battingPlayers);
-      setAvailableBowlers(bowlingPlayers);
-    } catch (error) {
+      setSb(await getScoreboard(matchId));
+    } catch (e) {
       toast({
         title: "Scorer Error!",
         variant: "destructive",
-        description: "Could not load match data.",
+        description: (e as Error).message || "Could not load match data.",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [matchId]);
 
-  const dispatchAndSync = (action: Parameters<typeof scoringReducer>[1]) => {
-    if (!state) return;
-    const next = scoringReducer(state, action);
-    setState(next);
-    pushBallEvent(state.matchId, next); // dummy — fire and forget for now
-  };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Rebuild the score by replaying the saved balls
+  const base = useMemo(() => (sb ? buildScoreState(sb) : null), [sb]);
+  const state = useMemo(() => {
+    if (!base || base.innings.length === 0 || !bowlerOverride) return base;
+    return scoringReducer(base, {
+      type: "SET_BOWLER",
+      payload: { bowlerId: bowlerOverride.id, bowlerName: bowlerOverride.name },
+    });
+  }, [base, bowlerOverride]);
 
   const resetBallBuilder = () => {
     setSelectedRuns(0);
@@ -75,16 +109,115 @@ export default function Scorer() {
     setPendingOutPlayerId(null);
   };
 
-  const handleSubmitBall = (newBatsmanId?: string, newBatsmanName?: string) => {
-    if (!state) return;
-    const innings = state.innings[state.currentInningsIndex];
+  const exit = () => navigate(-1);
 
-    if (isWicket && !pendingOutPlayerId) {
-      toast({ title: "Select who's out", variant: "destructive", description: "Choose the dismissed batsman first." });
-      return;
+  if (loading || !sb) {
+    return (
+      <section className="min-h-[100vh] flex items-center justify-center bg-background/80">
+        <p className="text-foreground/70 text-lg">Loading scorer…</p>
+      </section>
+    );
+  }
+
+  // ---------- set-up screens ----------
+  if (sb.matchStatus === "UPCOMING") {
+    return (
+      <Shell title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+        <TossPanel sb={sb} onDone={load} />
+      </Shell>
+    );
+  }
+
+  if (sb.matchStatus === "FINISHED" || sb.matchStatus === "ABANDONED") {
+    return (
+      <Shell title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+        <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center">
+          <p className="text-foreground mb-4">This match is {sb.matchStatus.toLowerCase()}. Scoring is closed.</p>
+          <button
+            onClick={() => navigate(`/viewer/${sb.matchId}`)}
+            className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
+          >
+            Open scoreboard
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (!state || state.innings.length === 0) {
+    return (
+      <Shell title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+        <InningsSetupPanel sb={sb} inningsNo={1} onDone={load} />
+      </Shell>
+    );
+  }
+
+  const innings = state.innings[state.currentInningsIndex];
+
+  if (innings.isComplete) {
+    if (state.currentInningsIndex === 0 && !sb.innings2) {
+      return (
+        <Shell title="Scorer" subtitle={`1st innings over: ${innings.totalRuns}/${innings.totalWickets}`} onExit={exit}>
+          <InningsSetupPanel sb={sb} inningsNo={2} onDone={load} />
+        </Shell>
+      );
     }
+    return (
+      <Shell title="Scorer" subtitle="Innings complete" onExit={exit}>
+        <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center space-y-4">
+          <p className="text-foreground">
+            {innings.battingTeam}: {innings.totalRuns}/{innings.totalWickets} in {innings.totalOvers}.
+            {innings.ballsInCurrentOver} overs
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={async () => {
+                try {
+                  await finishMatch(sb.matchId);
+                  toast({ title: "Match finished" });
+                  navigate(`/viewer/${sb.matchId}`);
+                } catch (e) {
+                  toast({ title: "Could not finish the match", variant: "destructive", description: (e as Error).message });
+                }
+              }}
+              className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
+            >
+              Finish match
+            </button>
+            <button
+              onClick={async () => {
+                if (!matchId) return;
+                try {
+                  await undoLastBall(matchId, state.currentInningsIndex + 1);
+                  await load();
+                } catch (e) {
+                  toast({ title: "Could not undo", variant: "destructive", description: (e as Error).message });
+                }
+              }}
+              className="px-6 py-2.5 bg-background/60 text-foreground rounded-full font-semibold"
+            >
+              Undo last ball
+            </button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
 
-    dispatchAndSync({
+  // ---------- scoring screen ----------
+  const inningsApi = state.currentInningsIndex === 0 ? sb.innings1 : sb.innings2;
+  const battingSquad = inningsApi?.battingTeamId === sb.teamAId ? sb.squadA : sb.squadB;
+  const bowlingSquad = inningsApi?.bowlingTeamId === sb.teamAId ? sb.squadA : sb.squadB;
+  const nameOf = (id: string) => sb.playerNames[id] ?? "Player";
+  const availableBatsmen = battingSquad
+    .filter((id) => !innings.battingOrder.includes(id))
+    .map((id) => ({ id, name: nameOf(id) }));
+  const availableBowlers = bowlingSquad.map((id) => ({ id, name: nameOf(id) }));
+
+  // Save one ball on the server, then reload (the reload replays all balls)
+  const submitBall = async (newBatsman?: { id: string; name: string }) => {
+    if (busy || !matchId) return;
+    const next = scoringReducer(state, {
       type: "RECORD_BALL",
       payload: {
         runs: selectedRuns,
@@ -93,44 +226,69 @@ export default function Scorer() {
         isWicket,
         wicketType: isWicket ? wicketType : undefined,
         outPlayerId: isWicket ? pendingOutPlayerId ?? undefined : undefined,
-        newBatsmanId,
-        newBatsmanName,
+        newBatsmanId: newBatsman?.id,
+        newBatsmanName: newBatsman?.name,
       },
     });
+    const balls = next.innings[next.currentInningsIndex].balls;
+    const ball = balls[balls.length - 1];
+    if (!ball) return;
 
-    if (isWicket && innings.totalWickets < 9) {
-      setShowNewBatsmanPicker(true);
-    } else {
+    setBusy(true);
+    try {
+      await postBall(matchId, toApiBall((state.currentInningsIndex + 1) as 1 | 2, ball, newBatsman?.id));
+      setBowlerOverride(null);
+      setShowNewBatsmanPicker(false);
       resetBallBuilder();
+      await load();
+    } catch (e) {
+      toast({ title: "Could not save the ball", variant: "destructive", description: (e as Error).message });
+    } finally {
+      setBusy(false);
     }
   };
 
+  const handleConfirm = () => {
+    if (isWicket && !pendingOutPlayerId) {
+      toast({ title: "Select who's out", variant: "destructive", description: "Choose the dismissed batsman first." });
+      return;
+    }
+    // a wicket needs the next batsman first, and the ball is saved ONCE when he is picked
+    if (isWicket && innings.totalWickets < 9 && availableBatsmen.length > 0) {
+      setShowNewBatsmanPicker(true);
+      return;
+    }
+    submitBall();
+  };
+
   const handleNewBatsmanSelected = (id: string, name: string) => {
-    handleSubmitBall(id, name);
-    setShowNewBatsmanPicker(false);
-    resetBallBuilder();
-    setAvailableBatsmen((prev) => prev.filter((p) => p.id !== id));
+    submitBall({ id, name });
   };
 
   const handleBowlerSelected = (id: string, name: string) => {
-    dispatchAndSync({ type: "SET_BOWLER", payload: { bowlerId: id, bowlerName: name } });
+    setBowlerOverride({ id, name });
     setShowBowlerPicker(false);
   };
 
-  const handleUndo = () => {
-    dispatchAndSync({ type: "UNDO_LAST_BALL" });
-    toast({ title: "Last ball removed", description: "Note: totals are not recomputed in this preview build." });
+  const handleUndo = async () => {
+    if (busy || !matchId) return;
+    if (innings.balls.length === 0) {
+      toast({ title: "Nothing to undo", description: "No balls bowled in this innings yet." });
+      return;
+    }
+    setBusy(true);
+    try {
+      await undoLastBall(matchId, state.currentInningsIndex + 1);
+      setBowlerOverride(null);
+      await load();
+      toast({ title: "Last ball removed", description: "The score was recalculated." });
+    } catch (e) {
+      toast({ title: "Could not undo", variant: "destructive", description: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  if (loading || !state) {
-    return (
-      <section className="min-h-[100vh] flex items-center justify-center bg-background/80">
-        <p className="text-foreground/70 text-lg">Loading scorer…</p>
-      </section>
-    );
-  }
-
-  const innings = state.innings[state.currentInningsIndex];
   const striker = innings.batsmen[innings.strikerId];
   const nonStriker = innings.batsmen[innings.nonStrikerId];
   const bowler = innings.bowlers[innings.currentBowlerId];
@@ -158,7 +316,7 @@ export default function Scorer() {
             </p>
           </div>
           <button
-            onClick={() => navigate(-1)}
+            onClick={exit}
             className="px-4 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold hover:bg-card transition-colors"
           >
             Exit
@@ -357,8 +515,9 @@ export default function Scorer() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => handleSubmitBall()}
-              className="flex-1 py-3.5 bg-red-600 text-white rounded-full font-bold text-base shadow-lg hover:bg-red-700 transition-colors"
+              onClick={handleConfirm}
+              disabled={busy}
+              className="flex-1 py-3.5 bg-red-600 text-white rounded-full font-bold text-base shadow-lg hover:bg-red-700 transition-colors disabled:opacity-60"
             >
               Confirm Ball
             </motion.button>
@@ -366,6 +525,7 @@ export default function Scorer() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleUndo}
+              disabled={busy}
               className="px-6 py-3.5 bg-background/60 text-foreground/80 rounded-full font-semibold text-base hover:bg-background transition-colors"
             >
               Undo
@@ -421,7 +581,12 @@ export default function Scorer() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
             >
-              <h3 className="text-xl font-bold text-foreground mb-4">Next batsman in</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-foreground">Next batsman in</h3>
+                <button onClick={() => setShowNewBatsmanPicker(false)} className="text-foreground/50 hover:text-foreground">
+                  ✕
+                </button>
+              </div>
               <div className="space-y-2">
                 {availableBatsmen.length === 0 && (
                   <p className="text-sm text-foreground/60">No more batsmen available — innings should end.</p>

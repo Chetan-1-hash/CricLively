@@ -1,3 +1,4 @@
+import { API_URL } from "./client";
 import { Gallery } from "../components/data/DTO";
 
 export async function addgalleryApi(file: File, year: number) {
@@ -6,7 +7,7 @@ export async function addgalleryApi(file: File, year: number) {
   formData.append("year", year.toString());
 
   const response = await fetch(
-    "http://localhost:8080/gallery/addImages",
+    `${API_URL}/gallery/addImages`,
     {
       method: "POST",
       credentials: "include",
@@ -23,7 +24,7 @@ export async function addgalleryApi(file: File, year: number) {
 }
 
 export async function getgalleryApi(){
-    const response = await fetch(`http://localhost:8080/gallery/`,{
+    const response = await fetch(`${API_URL}/gallery/`,{
         method:"GET",
         credentials: "include",
         headers: {
@@ -38,7 +39,7 @@ export async function getgalleryApi(){
     const images : Gallery[] = JSON.parse(await response.text());
     const imagesUrl = images.map(i => ({
         ...i,
-        fileName: `http://localhost:8080/images/${i.imageId}`
+        fileName: `${API_URL}/images/${i.imageId}`
     }));
     return imagesUrl;
 }

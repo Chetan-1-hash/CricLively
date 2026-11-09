@@ -1,7 +1,8 @@
+import { API_URL } from "./client";
 import type { TeamsList, Team } from "../components/data/DTO";
 
 export async function TeamsListAPI(): Promise<TeamsList[]> {
-    const resp = await fetch("http://localhost:8080/team/getTeamsList",{
+    const resp = await fetch(`${API_URL}/team/getTeamsList`,{
         credentials:"include",
         method:"GET"
     });
@@ -31,7 +32,7 @@ export async function addTeamAPI(team:Team) {
         formData.append("logoImage", team.logoImage)
     }
 
-    const resp = await fetch("http://localhost:8080/team/addTeam", {
+    const resp = await fetch(`${API_URL}/team/addTeam`, {
         credentials:"include",
         method:"POST",
         body:formData

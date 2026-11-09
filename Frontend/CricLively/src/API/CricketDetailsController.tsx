@@ -1,3 +1,4 @@
+import { API_URL } from "./client";
 import type { PlayerCricketDetailsRequest, PlayerRegisterResponse } from "../components/data/DTO";
 
 export async function addCricketDetails(playerId: string, payload: PlayerCricketDetailsRequest) : Promise<PlayerRegisterResponse>{
@@ -21,7 +22,7 @@ export async function addCricketDetails(playerId: string, payload: PlayerCricket
     }
 
 
-    const response = await fetch(`http://localhost:8080/player/${playerId}/playerInfo`, {
+    const response = await fetch(`${API_URL}/player/${playerId}/playerInfo`, {
         method: "PUT",
         body: formData,
         credentials: "include"

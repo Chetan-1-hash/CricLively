@@ -1,7 +1,8 @@
+import { API_URL } from "./client";
 import type { AddMatchDTO, MatchResponse } from "../components/data/MatchEntity";
 
 export async function getAllMatches(): Promise<MatchResponse[]> {
-    const response = await fetch(`http://localhost:8080/matches`, {
+    const response = await fetch(`${API_URL}/matches`, {
         method: "GET",
         credentials: "include",
     });
@@ -15,7 +16,7 @@ export async function getAllMatches(): Promise<MatchResponse[]> {
 }
 
 export async function getTournamentMatches(tournamentId: string): Promise<MatchResponse[]> {
-    const response = await fetch(`http://localhost:8080/matches/${tournamentId}`, {
+    const response = await fetch(`${API_URL}/matches/${tournamentId}`, {
         method: "GET",
         credentials: "include",
     });
@@ -29,7 +30,7 @@ export async function getTournamentMatches(tournamentId: string): Promise<MatchR
 }
 
 export async function addMatch(addMatch: AddMatchDTO):Promise<boolean>{
-    const response = await fetch("http://localhost:8080/matches",{
+    const response = await fetch(`${API_URL}/matches`,{
         method: "POST",
         credentials: "include",
         headers: {

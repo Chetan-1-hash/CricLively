@@ -1,9 +1,10 @@
+import { API_URL } from "./client";
 
 export default async function ImageController(playerId: string): Promise<string | null> {
   try {
     if (!playerId) return null;
 
-    const playerRes = await fetch(`http://localhost:8080/player/${playerId}`, {
+    const playerRes = await fetch(`${API_URL}/player/${playerId}`, {
       method: "GET",
       // IMPORTANT: This must be present in EVERY request to protected routes
       credentials: "include", 
@@ -17,7 +18,7 @@ export default async function ImageController(playerId: string): Promise<string 
 
     if (!player.image) return null;
 
-    return `http://localhost:8080/images/${player.image}`;
+    return `${API_URL}/images/${player.image}`;
   } catch (error) {
     console.error("ImageController error:", error);
     return null;

@@ -9,4 +9,8 @@ public interface BallByBallRepository extends MongoRepository<BallByBall, String
 
     List<BallByBall> findByMatchIdAndInningsNo(String matchId, Integer inningsNo);
 
+    List<BallByBall> findByMatchIdAndInningsNoOrderBySeqAsc(String matchId, Integer inningsNo);
+
+    long countByMatchIdAndInningsNo(String matchId, Integer inningsNo);
+
 }

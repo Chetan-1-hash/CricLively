@@ -1,4 +1,5 @@
 import { canOrganize } from "../lib/auth";
+import { openScoreboard, openScorer } from "../lib/matchAccess";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
@@ -190,14 +191,10 @@ export default function DashboardMatches() {
                         status={match.matchStatus}
                         time={`${match.date} ${match.time}`}
                         venue={match.venue}
-                        onViewScoreboard={
-                          match.matchStatus === "LIVE" || match.matchStatus === "FINISHED"
-                            ? () => navigate(`/viewer/${match.matchId}`)
-                            : undefined
-                        }
+                        onViewScoreboard={() => openScoreboard(match, navigate)}
                         onScore={
-                          organizer && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING")
-                            ? () => navigate(`/scorer/${match.matchId}`)
+                          match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING"
+                            ? () => openScorer(match, navigate)
                             : undefined
                         }
                         scoreLabel={match.matchStatus === "UPCOMING" ? "Start Scoring" : "Score"}
