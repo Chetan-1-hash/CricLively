@@ -50,6 +50,8 @@ export class MatchResponse {
     teamAName!: string;
     teamBName!: string;
     matchStatus!: MatchStatus;
+    canScore?: boolean;  // may I score this match?
+    canManage?: boolean; // may I give others scoring access?
 
     firstInnings?: InningsSummaryDTO;
     secondInnings?: InningsSummaryDTO;

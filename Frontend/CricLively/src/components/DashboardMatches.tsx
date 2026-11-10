@@ -1,5 +1,6 @@
 import { canOrganize } from "../lib/auth";
 import { openScoreboard, openScorer } from "../lib/matchAccess";
+import ScorerAccessDialog from "./ScorerAccessDialog";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
@@ -16,6 +17,7 @@ export default function DashboardMatches() {
   const navigate = useNavigate();
   const organizer = canOrganize(); // only organizers/admins see the create menu
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [accessMatchId, setAccessMatchId] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [activeTab, setActiveTab] = useState<
     "matches" | "points" | "leaderboard"
@@ -66,6 +68,15 @@ export default function DashboardMatches() {
   return (
     <>
       <Navbar />
+      {accessMatchId && (
+        <ScorerAccessDialog
+          matchId={accessMatchId}
+          onClose={() => {
+            setAccessMatchId(null);
+            loadAllMatches();
+          }}
+        />
+      )}
 
       <section className="min-h-[100vh] relative py-20 bg-background/80">
         {/* COVER SECTION */}
@@ -193,8 +204,13 @@ export default function DashboardMatches() {
                         venue={match.venue}
                         onViewScoreboard={() => openScoreboard(match, navigate)}
                         onScore={
-                          match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING"
+                          match.canScore && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING")
                             ? () => openScorer(match, navigate)
+                            : undefined
+                        }
+                        onManageAccess={
+                          match.canManage && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING")
+                            ? () => setAccessMatchId(match.matchId)
                             : undefined
                         }
                         scoreLabel={match.matchStatus === "UPCOMING" ? "Start Scoring" : "Score"}

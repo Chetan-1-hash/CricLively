@@ -23,6 +23,10 @@ public class MatchDashboardDTO {
     // Status Logic
     private MatchStatus matchStatus; // LIVE, FINISHED, ABANDONED, or UPCOMING
 
+    // For the person who asked: may they score this match / give others scoring access?
+    private Boolean canScore;
+    private Boolean canManage;
+
     // Scores (Populated only if status is LIVE or FINISHED)
     private InningsSummaryDTO innings1;
     private InningsSummaryDTO innings2;

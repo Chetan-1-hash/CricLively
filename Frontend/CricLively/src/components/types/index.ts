@@ -12,6 +12,7 @@ export interface MatchCardProps {
   onViewScoreboard?: () => void; // shown to everyone logged in
   onScore?: () => void;          // only passed in for organizers/admins
   scoreLabel?: string;
+  onManageAccess?: () => void;   // only for the main organizer / admin
 }
 
 export interface Scoreboard {

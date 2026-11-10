@@ -57,6 +57,7 @@ export class ProfileList {
   firstName!: string;
   middleName?: string;
   lastName!: string;
+  role?: string[]; // PLAYER, ORGANIZER
 
   constructor(init?: Partial<ProfileList>) {
     Object.assign(this, init);

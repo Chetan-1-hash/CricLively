@@ -61,6 +61,8 @@ export interface ScoreboardResponse {
   teamBName: string;
   squadA: string[];
   squadB: string[];
+  playingA: string[]; // who plays today
+  playingB: string[];
   playerNames: Record<string, string>;
   toss: ApiToss | null;
   innings1: ApiInnings | null;
@@ -92,3 +94,26 @@ export const finishMatch = (matchId: string) =>
 
 export const abandonMatch = (matchId: string) =>
   api(`/matches/${matchId}/abandon`, { method: "POST" });
+
+export const setLineup = (matchId: string, teamA: string[], teamB: string[]) =>
+  api(`/matches/${matchId}/lineup`, { method: "POST", body: { teamA, teamB } });
+
+export interface AccessPerson {
+  profileId: string;
+  name: string;
+  email: string;
+}
+
+export interface MatchAccess {
+  canScore: boolean;
+  canManage: boolean;
+  ownerId: string | null;
+  ownerName: string | null;
+  scorers: AccessPerson[];
+  tournamentOrganizers: AccessPerson[];
+}
+
+export const getAccess = (matchId: string) => api<MatchAccess>(`/matches/${matchId}/access`);
+
+export const setScorers = (matchId: string, profileIds: string[]) =>
+  api<MatchAccess>(`/matches/${matchId}/scorers`, { method: "PUT", body: { profileIds } });

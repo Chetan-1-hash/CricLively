@@ -220,7 +220,7 @@ export default function ViewerPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-foreground/50 text-left border-b border-foreground/10">
-                      <th className="py-2 pr-4 font-semibold">Batsman</th>
+                      <th className="py-2 pr-4 font-semibold">Batter</th>
                       <th className="py-2 px-2 font-semibold text-right">R</th>
                       <th className="py-2 px-2 font-semibold text-right">B</th>
                       <th className="py-2 px-2 font-semibold text-right">4s</th>

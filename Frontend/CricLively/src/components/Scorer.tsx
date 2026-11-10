@@ -7,6 +7,8 @@ import {
   getScoreboard,
   postBall,
   undoLastBall,
+  getAccess,
+  type MatchAccess,
   type ScoreboardResponse,
 } from "../API/ScoringAPI";
 import { buildScoreState, toApiBall } from "../lib/scoreAdapter";
@@ -14,18 +16,23 @@ import type { ExtraType, WicketType } from "./data/MatchScoringTypes";
 import { scoringReducer } from "./data/scoringReducer";
 import Navbar from "./Navbar";
 import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
+import LineupPanel from "./LineupPanel";
+import ScorerAccessDialog from "./ScorerAccessDialog";
 
 const WICKET_TYPES: WicketType[] = ["Bowled", "Caught", "LBW", "Run Out", "Stumped", "Hit Wicket", "Retired Hurt"];
 const EXTRA_TYPES: ExtraType[] = ["None", "Wide", "No Ball", "Bye", "Leg Bye"];
 const RUN_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
 // Page frame used by the set-up screens (toss, innings, finish)
-function Shell({ title, subtitle, onExit, children }: {
+function Shell({ title, subtitle, onExit, matchId, canManage, children }: {
   title: string;
   subtitle?: string;
   onExit: () => void;
+  matchId?: string;
+  canManage?: boolean;
   children: React.ReactNode;
 }) {
+  const [showAccess, setShowAccess] = useState(false);
   return (
     <>
       <Navbar />
@@ -36,16 +43,27 @@ function Shell({ title, subtitle, onExit, children }: {
               <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">{title}</h1>
               {subtitle && <p className="text-sm text-foreground/70 mt-1">{subtitle}</p>}
             </div>
-            <button
-              onClick={onExit}
-              className="px-4 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold hover:bg-card transition-colors"
-            >
-              Exit
-            </button>
+            <div className="flex gap-2">
+              {canManage && matchId && (
+                <button
+                  onClick={() => setShowAccess(true)}
+                  className="px-4 py-2 rounded-full bg-red-600 text-white text-sm font-semibold"
+                >
+                  Scoring access
+                </button>
+              )}
+              <button
+                onClick={onExit}
+                className="px-4 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold hover:bg-card transition-colors"
+              >
+                Exit
+              </button>
+            </div>
           </div>
           {children}
         </div>
       </section>
+      {showAccess && matchId && <ScorerAccessDialog matchId={matchId} onClose={() => setShowAccess(false)} />}
     </>
   );
 }
@@ -58,6 +76,8 @@ export default function Scorer() {
   const [sb, setSb] = useState<ScoreboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [access, setAccess] = useState<MatchAccess | null>(null); // may I score? may I give access?
+  const [showAccess, setShowAccess] = useState(false);
   // a bowler chosen on screen; it is saved together with the next ball
   const [bowlerOverride, setBowlerOverride] = useState<{ id: string; name: string } | null>(null);
 
@@ -75,6 +95,7 @@ export default function Scorer() {
     if (!matchId) return;
     try {
       setSb(await getScoreboard(matchId));
+      getAccess(matchId).then(setAccess).catch(() => undefined);
     } catch (e) {
       toast({
         title: "Scorer Error!",
@@ -119,10 +140,32 @@ export default function Scorer() {
     );
   }
 
+  // ---------- no scoring access ----------
+  if (access && !access.canScore) {
+    return (
+      <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+        <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center space-y-3">
+          <p className="text-foreground font-semibold">You do not have scoring access for this match.</p>
+          <p className="text-sm text-foreground/70">
+            {access.ownerName
+              ? `Ask ${access.ownerName}, the main organizer, to give you access.`
+              : "Ask the organizer of this match to give you access."}
+          </p>
+          <button
+            onClick={() => navigate(`/viewer/${sb.matchId}`)}
+            className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
+          >
+            Open scoreboard
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
   // ---------- set-up screens ----------
   if (sb.matchStatus === "UPCOMING") {
     return (
-      <Shell title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+      <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
         <TossPanel sb={sb} onDone={load} />
       </Shell>
     );
@@ -130,7 +173,7 @@ export default function Scorer() {
 
   if (sb.matchStatus === "FINISHED" || sb.matchStatus === "ABANDONED") {
     return (
-      <Shell title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+      <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
         <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center">
           <p className="text-foreground mb-4">This match is {sb.matchStatus.toLowerCase()}. Scoring is closed.</p>
           <button
@@ -144,9 +187,18 @@ export default function Scorer() {
     );
   }
 
+  // step 2: who plays today
+  if ((sb.playingA ?? []).length === 0 || (sb.playingB ?? []).length === 0) {
+    return (
+      <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+        <LineupPanel sb={sb} onDone={load} />
+      </Shell>
+    );
+  }
+
   if (!state || state.innings.length === 0) {
     return (
-      <Shell title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
+      <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`${sb.teamAName} vs ${sb.teamBName}`} onExit={exit}>
         <InningsSetupPanel sb={sb} inningsNo={1} onDone={load} />
       </Shell>
     );
@@ -157,13 +209,13 @@ export default function Scorer() {
   if (innings.isComplete) {
     if (state.currentInningsIndex === 0 && !sb.innings2) {
       return (
-        <Shell title="Scorer" subtitle={`1st innings over: ${innings.totalRuns}/${innings.totalWickets}`} onExit={exit}>
+        <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`1st innings over: ${innings.totalRuns}/${innings.totalWickets}`} onExit={exit}>
           <InningsSetupPanel sb={sb} inningsNo={2} onDone={load} />
         </Shell>
       );
     }
     return (
-      <Shell title="Scorer" subtitle="Innings complete" onExit={exit}>
+      <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle="Innings complete" onExit={exit}>
         <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center space-y-4">
           <p className="text-foreground">
             {innings.battingTeam}: {innings.totalRuns}/{innings.totalWickets} in {innings.totalOvers}.
@@ -206,8 +258,9 @@ export default function Scorer() {
 
   // ---------- scoring screen ----------
   const inningsApi = state.currentInningsIndex === 0 ? sb.innings1 : sb.innings2;
-  const battingSquad = inningsApi?.battingTeamId === sb.teamAId ? sb.squadA : sb.squadB;
-  const bowlingSquad = inningsApi?.bowlingTeamId === sb.teamAId ? sb.squadA : sb.squadB;
+  // only players picked for today's match
+  const battingSquad = inningsApi?.battingTeamId === sb.teamAId ? sb.playingA : sb.playingB;
+  const bowlingSquad = inningsApi?.bowlingTeamId === sb.teamAId ? sb.playingA : sb.playingB;
   const nameOf = (id: string) => sb.playerNames[id] ?? "Player";
   const availableBatsmen = battingSquad
     .filter((id) => !innings.battingOrder.includes(id))
@@ -250,7 +303,7 @@ export default function Scorer() {
 
   const handleConfirm = () => {
     if (isWicket && !pendingOutPlayerId) {
-      toast({ title: "Select who's out", variant: "destructive", description: "Choose the dismissed batsman first." });
+      toast({ title: "Select who's out", variant: "destructive", description: "Choose the dismissed batter first." });
       return;
     }
     // a wicket needs the next batsman first, and the ball is saved ONCE when he is picked
@@ -315,12 +368,22 @@ export default function Scorer() {
               {innings.battingTeam} vs {innings.bowlingTeam} · Over {overDisplay} / {state.maxOvers}
             </p>
           </div>
-          <button
-            onClick={exit}
-            className="px-4 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold hover:bg-card transition-colors"
-          >
-            Exit
-          </button>
+          <div className="flex gap-2">
+            {access?.canManage && (
+              <button
+                onClick={() => setShowAccess(true)}
+                className="px-4 py-2 rounded-full bg-red-600 text-white text-sm font-semibold"
+              >
+                Scoring access
+              </button>
+            )}
+            <button
+              onClick={exit}
+              className="px-4 py-2 rounded-full bg-card/80 text-foreground/80 text-sm font-semibold hover:bg-card transition-colors"
+            >
+              Exit
+            </button>
+          </div>
         </motion.div>
 
         {/* Live score summary card */}
@@ -582,14 +645,14 @@ export default function Scorer() {
               exit={{ scale: 0.9, opacity: 0 }}
             >
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-foreground">Next batsman in</h3>
+                <h3 className="text-xl font-bold text-foreground">Next batter in</h3>
                 <button onClick={() => setShowNewBatsmanPicker(false)} className="text-foreground/50 hover:text-foreground">
                   ✕
                 </button>
               </div>
               <div className="space-y-2">
                 {availableBatsmen.length === 0 && (
-                  <p className="text-sm text-foreground/60">No more batsmen available — innings should end.</p>
+                  <p className="text-sm text-foreground/60">No more batters available — innings should end.</p>
                 )}
                 {availableBatsmen.map((p) => (
                   <button
@@ -643,6 +706,7 @@ export default function Scorer() {
         )}
       </AnimatePresence>
     </section>
+    {showAccess && <ScorerAccessDialog matchId={sb.matchId} onClose={() => setShowAccess(false)} />}
     </>
   );
 }

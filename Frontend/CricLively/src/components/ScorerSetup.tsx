@@ -96,7 +96,8 @@ export function InningsSetupPanel({
   const bowlingTeamId = other(battingTeamId);
 
   const nameOf = (id: string) => (id === sb.teamAId ? sb.teamAName : sb.teamBName);
-  const squad = (teamId: string) => (teamId === sb.teamAId ? sb.squadA : sb.squadB);
+  // only players picked for today's match
+  const squad = (teamId: string) => (teamId === sb.teamAId ? sb.playingA : sb.playingB) ?? [];
   const label = (playerId: string) => sb.playerNames[playerId] ?? "Player";
 
   const batters = squad(battingTeamId);
@@ -140,13 +141,13 @@ export function InningsSetupPanel({
 
       {batters.length < 2 || bowlers.length < 1 ? (
         <p className="text-sm text-red-600">
-          A team needs at least 2 batting players and 1 bowler in its squad. Add players to the squad first.
+          Each playing team needs at least 2 players. Go back and pick the playing teams again.
         </p>
       ) : (
         <>
           <label className="block text-xs font-medium text-foreground mb-1.5">Opener on strike</label>
           <select className={selectCls} value={striker} onChange={(e) => setStriker(e.target.value)}>
-            <option value="">Select batsman</option>
+            <option value="">Select batter</option>
             {batters.map((id) => (
               <option key={id} value={id}>{label(id)}</option>
             ))}
@@ -154,7 +155,7 @@ export function InningsSetupPanel({
 
           <label className="block text-xs font-medium text-foreground mt-4 mb-1.5">Opener at the other end</label>
           <select className={selectCls} value={nonStriker} onChange={(e) => setNonStriker(e.target.value)}>
-            <option value="">Select batsman</option>
+            <option value="">Select batter</option>
             {batters.map((id) => (
               <option key={id} value={id} disabled={id === striker}>{label(id)}</option>
             ))}

@@ -8,6 +8,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.Set;
 
 @Data
 @Document
@@ -27,4 +29,12 @@ import java.time.LocalTime;
     private Toss toss;
     private Innings innings1;
     private Innings innings2;
+
+    // WHO MAY SCORE (profile ids)
+    private String ownerId;           // the main organizer: made the match (or started scoring an old one)
+    private Set<String> scorerIds;    // other organizers the main organizer gave scoring access to
+
+    // WHO PLAYS TODAY (profile ids picked from the squads)
+    private List<String> playingXiA;
+    private List<String> playingXiB;
 }

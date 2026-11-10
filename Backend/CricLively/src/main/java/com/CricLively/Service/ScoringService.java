@@ -6,6 +6,7 @@ import com.CricLively.Entities.Enums.MatchStatus;
 import com.CricLively.Repository.BallByBallRepository;
 import com.CricLively.Repository.MatchRepository;
 import com.CricLively.Repository.PlayerRepository;
+import com.CricLively.Repository.ProfileRepository;
 import com.CricLively.Repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,15 +17,22 @@ import java.util.*;
  * The rules of scoring. Balls are the single source of truth:
  * after every change the innings totals are recomputed from the balls,
  * so "undo" and "refresh the page" can never disagree with the score.
+ *
+ * Match steps:  toss  ->  playing teams  ->  innings 1 (openers + bowler)  ->  balls  ->  innings 2 ...  ->  finish
+ * WHO may do the steps is checked before these methods run (MatchAccessService).
  */
 @Service
 @RequiredArgsConstructor
 public class ScoringService {
 
+    static final int MIN_PLAYERS = 2;
+    static final int MAX_PLAYERS = 11;
+
     private final MatchRepository matchRepository;
     private final BallByBallRepository ballRepository;
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
+    private final ProfileRepository profileRepository;
 
     // ------------------------------------------------------------ read
 
@@ -33,13 +41,11 @@ public class ScoringService {
         Team teamA = teamRepository.findById(match.getTeamAId()).orElse(null);
         Team teamB = teamRepository.findById(match.getTeamBId()).orElse(null);
 
-        List<String> squadA = teamA != null && teamA.getSquadPlayerIds() != null ? teamA.getSquadPlayerIds() : List.of();
-        List<String> squadB = teamB != null && teamB.getSquadPlayerIds() != null ? teamB.getSquadPlayerIds() : List.of();
+        List<String> squadA = squadOf(teamA);
+        List<String> squadB = squadOf(teamB);
 
         Set<String> ids = new LinkedHashSet<>(squadA);
         ids.addAll(squadB);
-        Map<String, String> names = new HashMap<>();
-        playerRepository.findAllById(ids).forEach(p -> names.put(p.getId(), fullName(p)));
 
         return ScoreboardResponse.builder()
                 .matchId(match.getId())
@@ -56,7 +62,9 @@ public class ScoringService {
                 .teamBName(teamB != null ? teamB.getTeamName() : "Unknown team")
                 .squadA(squadA)
                 .squadB(squadB)
-                .playerNames(names)
+                .playingA(match.getPlayingXiA() == null ? List.of() : match.getPlayingXiA())
+                .playingB(match.getPlayingXiB() == null ? List.of() : match.getPlayingXiB())
+                .playerNames(namesOf(ids))
                 .toss(match.getToss())
                 .innings1(match.getInnings1())
                 .innings2(match.getInnings2())
@@ -87,10 +95,28 @@ public class ScoringService {
         return matchRepository.save(match);
     }
 
+    /** Step 2: who plays today. Can be changed until the first innings starts. */
+    public Match setLineup(String matchId, List<String> teamA, List<String> teamB) {
+        Match match = findMatch(matchId);
+        requireLive(match);
+        if (match.getToss() == null) throw new IllegalStateException("Do the toss first");
+        if (match.getInnings1() != null) throw new IllegalStateException("The innings has started, the playing teams are locked");
+
+        Team a = teamRepository.findById(match.getTeamAId()).orElseThrow(() -> new IllegalArgumentException("Team 1 not found"));
+        Team b = teamRepository.findById(match.getTeamBId()).orElseThrow(() -> new IllegalArgumentException("Team 2 not found"));
+
+        match.setPlayingXiA(checkLineup(teamA, squadOf(a), a.getTeamName()));
+        match.setPlayingXiB(checkLineup(teamB, squadOf(b), b.getTeamName()));
+        return matchRepository.save(match);
+    }
+
     public Match startInnings(String matchId, int inningsNo, Innings innings) {
         Match match = findMatch(matchId);
         requireLive(match);
         if (match.getToss() == null) throw new IllegalStateException("Do the toss first");
+        if (isEmpty(match.getPlayingXiA()) || isEmpty(match.getPlayingXiB())) {
+            throw new IllegalStateException("Pick the playing team of both sides first");
+        }
 
         if (inningsNo == 1 && match.getInnings1() != null) throw new IllegalStateException("Innings 1 has already started");
         if (inningsNo == 2) {
@@ -109,10 +135,20 @@ public class ScoringService {
         }
         if (isBlank(innings.getCurrentStrikerId()) || isBlank(innings.getCurrentNonStrikerId())
                 || isBlank(innings.getCurrentBowlerId())) {
-            throw new IllegalArgumentException("Pick two opening batsmen and an opening bowler");
+            throw new IllegalArgumentException("Pick two opening batters and an opening bowler");
         }
         if (innings.getCurrentStrikerId().equals(innings.getCurrentNonStrikerId())) {
             throw new IllegalArgumentException("The two openers must be different players");
+        }
+
+        // openers must be in today's batting team, the bowler in today's bowling team
+        List<String> battingXi = innings.getBattingTeamId().equals(match.getTeamAId()) ? match.getPlayingXiA() : match.getPlayingXiB();
+        List<String> bowlingXi = innings.getBowlingTeamId().equals(match.getTeamAId()) ? match.getPlayingXiA() : match.getPlayingXiB();
+        if (!battingXi.contains(innings.getCurrentStrikerId()) || !battingXi.contains(innings.getCurrentNonStrikerId())) {
+            throw new IllegalArgumentException("Openers must be from the playing team");
+        }
+        if (!bowlingXi.contains(innings.getCurrentBowlerId())) {
+            throw new IllegalArgumentException("The bowler must be from the playing team");
         }
 
         innings.setInningsNumber(inningsNo);
@@ -182,6 +218,47 @@ public class ScoringService {
 
     // ------------------------------------------------------------ helpers
 
+    private List<String> checkLineup(List<String> picked, List<String> squad, String teamName) {
+        List<String> clean = new ArrayList<>(new LinkedHashSet<>(picked == null ? List.<String>of() : picked));
+        if (clean.size() < MIN_PLAYERS || clean.size() > MAX_PLAYERS) {
+            throw new IllegalArgumentException(teamName + ": pick between " + MIN_PLAYERS + " and " + MAX_PLAYERS + " players");
+        }
+        for (String id : clean) {
+            if (!squad.contains(id)) throw new IllegalArgumentException(teamName + ": a picked player is not in the squad");
+        }
+        return clean;
+    }
+
+    private static List<String> squadOf(Team team) {
+        return team != null && team.getSquadPlayerIds() != null ? team.getSquadPlayerIds() : List.of();
+    }
+
+    /**
+     * Squads store PROFILE ids (that is what the team page picks from).
+     * A profile points to its player, and the player has the name.
+     */
+    private Map<String, String> namesOf(Collection<String> ids) {
+        Map<String, Profile> profiles = new HashMap<>();
+        profileRepository.findAllById(ids).forEach(p -> profiles.put(p.getId(), p));
+
+        Set<String> playerIds = new HashSet<>();
+        for (String id : ids) {
+            Profile p = profiles.get(id);
+            if (p == null) playerIds.add(id);                        // the id may already be a player id
+            else if (p.getPlayerId() != null) playerIds.add(p.getPlayerId());
+        }
+        Map<String, Player> players = new HashMap<>();
+        playerRepository.findAllById(playerIds).forEach(p -> players.put(p.getId(), p));
+
+        Map<String, String> names = new HashMap<>();
+        for (String id : ids) {
+            Profile p = profiles.get(id);
+            Player pl = p == null ? players.get(id) : (p.getPlayerId() == null ? null : players.get(p.getPlayerId()));
+            names.put(id, pl != null ? fullName(pl) : (p != null && p.getEmail() != null ? p.getEmail() : "Player"));
+        }
+        return names;
+    }
+
     /** Totals come from the balls, never from a number typed in by someone. */
     private void refreshSummary(Match match, int inningsNo) {
         Innings innings = inningsNo == 1 ? match.getInnings1() : match.getInnings2();
@@ -220,6 +297,10 @@ public class ScoringService {
 
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    private static boolean isEmpty(List<String> l) {
+        return l == null || l.isEmpty();
     }
 
     private static void requireLive(Match match) {

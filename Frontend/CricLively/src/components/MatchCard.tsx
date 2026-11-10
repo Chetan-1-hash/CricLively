@@ -12,7 +12,8 @@ export default function MatchCard({
   index,
   onViewScoreboard,
   onScore,
-  scoreLabel
+  scoreLabel,
+  onManageAccess
 }
 : MatchCardProps) {
   return (
@@ -113,6 +114,15 @@ export default function MatchCard({
             </motion.button>
           )}
         </div>
+      )}
+
+      {onManageAccess && (
+        <button
+          onClick={onManageAccess}
+          className="mt-3 w-full text-xs font-semibold text-foreground/70 hover:text-foreground underline"
+        >
+          Scoring access
+        </button>
       )}
     </motion.div>
   );

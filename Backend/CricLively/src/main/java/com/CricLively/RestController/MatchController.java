@@ -5,6 +5,7 @@ import com.CricLively.DTO.MatchDashboardDTO;
 import com.CricLively.Entities.Match;
 import com.CricLively.Service.MatchService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,19 +22,19 @@ public class MatchController {
     }
 
     @GetMapping
-    public List<MatchDashboardDTO> getAllMatches(){
-        return matchService.getAllMatches();
+    public List<MatchDashboardDTO> getAllMatches(Authentication auth){
+        return matchService.getAllMatches(auth);
     }
 
     @GetMapping("/{tournamentId}")
-    public List<MatchDashboardDTO> getTournamentMatches(@PathVariable String tournamentId){
-        return matchService.getTournamentMatches(tournamentId);
+    public List<MatchDashboardDTO> getTournamentMatches(@PathVariable String tournamentId, Authentication auth){
+        return matchService.getTournamentMatches(tournamentId, auth);
     }
 
     @PostMapping
-    public ResponseEntity<?> addMatch(@RequestBody AddMatchDTO addmatch) {
+    public ResponseEntity<?> addMatch(@RequestBody AddMatchDTO addmatch, Authentication auth) {
         try{
-            matchService.addMatch(addmatch);
+            matchService.addMatch(addmatch, auth.getName());
             System.out.println("Match created successfully");
             return ResponseEntity.ok(
                     Map.of(

@@ -1,5 +1,6 @@
 import { canOrganize } from "../lib/auth";
 import { openScoreboard, openScorer } from "../lib/matchAccess";
+import ScorerAccessDialog from "./ScorerAccessDialog";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useEffect, useState } from "react";
@@ -15,6 +16,7 @@ export default function Matches() {
   const navigate = useNavigate();
   const organizer = canOrganize(); // only organizers/admins see the create menu
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [accessMatchId, setAccessMatchId] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<MatchStatus>("UPCOMING");
 
@@ -47,6 +49,15 @@ export default function Matches() {
   return (
     <>
       <Navbar />
+      {accessMatchId && (
+        <ScorerAccessDialog
+          matchId={accessMatchId}
+          onClose={() => {
+            setAccessMatchId(null);
+            loadAllMatches();
+          }}
+        />
+      )}
       <section className="min-h-[100vh] py-12 bg-background/80">
         <div className="container my-12 mx-auto px-6">
           {/* Header */}
@@ -152,8 +163,8 @@ export default function Matches() {
                     Scoreboard
                   </motion.button>
 
-                  {/* everybody sees it; a player who clicks gets a message saying why not */}
-                  {(match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING") && (
+                  {/* only people who may score THIS match see it */}
+                  {match.canScore && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING") && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -164,6 +175,15 @@ export default function Matches() {
                     </motion.button>
                   )}
                 </div>
+
+                {match.canManage && (match.matchStatus === "LIVE" || match.matchStatus === "UPCOMING") && (
+                  <button
+                    onClick={() => setAccessMatchId(match.matchId)}
+                    className="mt-3 w-full text-xs font-semibold text-foreground/70 hover:text-foreground underline"
+                  >
+                    Scoring access
+                  </button>
+                )}
               </motion.div>
             ))}
           </div>

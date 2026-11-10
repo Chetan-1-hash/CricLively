@@ -32,6 +32,8 @@ public class ScoreboardResponse {
     private String teamBName;
     private List<String> squadA;          // player ids
     private List<String> squadB;
+    private List<String> playingA;        // who plays today (picked from the squad)
+    private List<String> playingB;
     private Map<String, String> playerNames; // player id -> full name (both squads)
 
     private Toss toss;

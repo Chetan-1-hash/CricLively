@@ -6,9 +6,11 @@ import com.CricLively.Entities.*;
 import com.CricLively.Entities.Enums.MatchStatus;
 import com.CricLively.Entities.Enums.MatchType;
 import com.CricLively.Repository.MatchRepository;
+import com.CricLively.Repository.ProfileRepository;
 import com.CricLively.Repository.TeamRepository;
 import com.CricLively.Repository.TournamentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,9 +25,12 @@ public class MatchService {
     private final MatchRepository matchRepository;
     private final TournamentRepository tournamentRepository;
     private final TeamRepository teamRepository;
+    private final MatchAccessService accessService;
+    private final ProfileRepository profileRepository;
 
     /** Every match - tournament matches AND single (tournament-less) matches. */
-    public List<MatchDashboardDTO> getAllMatches() {
+    public List<MatchDashboardDTO> getAllMatches(Authentication auth) {
+        MatchAccessService.Actor actor = accessService.actor(auth);
         Map<String, Tournament> tournaments = tournamentRepository.findAll().stream()
                 .collect(Collectors.toMap(Tournament::getId, t -> t, (a, b) -> a));
 
@@ -36,12 +41,13 @@ public class MatchService {
                             : tournaments.get(match.getTournamentId());
                     Team teamA = teamRepository.findTeamNameById(match.getTeamAId());
                     Team teamB = teamRepository.findTeamNameById(match.getTeamBId());
-                    return convertToDashboardDTO(match, tournament, teamA, teamB);
+                    return convertToDashboardDTO(match, tournament, teamA, teamB, actor);
                 })
                 .collect(Collectors.toList());
     }
 
-    public List<MatchDashboardDTO> getTournamentMatches(String tournamentId) {
+    public List<MatchDashboardDTO> getTournamentMatches(String tournamentId, Authentication auth) {
+        MatchAccessService.Actor actor = accessService.actor(auth);
 
         Tournament tournament = tournamentRepository.findTournamentById(tournamentId);
         if (tournament == null) {
@@ -54,12 +60,13 @@ public class MatchService {
                     Team teamA = teamRepository.findTeamNameById(match.getTeamAId());
                     Team teamB = teamRepository.findTeamNameById(match.getTeamBId());
 
-                    return convertToDashboardDTO(match, tournament, teamA, teamB);
+                    return convertToDashboardDTO(match, tournament, teamA, teamB, actor);
                 })
                 .collect(Collectors.toList());
     }
 
-    public MatchDashboardDTO convertToDashboardDTO(Match match, Tournament tournament, Team teamA, Team teamB) {
+    public MatchDashboardDTO convertToDashboardDTO(Match match, Tournament tournament, Team teamA, Team teamB,
+                                                   MatchAccessService.Actor actor) {
         String teamAName = teamA != null ? teamA.getTeamName() : "Unknown team";
         String teamBName = teamB != null ? teamB.getTeamName() : "Unknown team";
         MatchDashboardDTO.MatchDashboardDTOBuilder builder = MatchDashboardDTO.builder()
@@ -72,7 +79,9 @@ public class MatchService {
                 .time(match.getTime())
                 .teamAName(teamAName)
                 .teamBName(teamBName)
-                .matchStatus(match.getMatchStatus());
+                .matchStatus(match.getMatchStatus())
+                .canScore(accessService.canScore(actor, match, tournament))
+                .canManage(accessService.canManage(actor, match, tournament));
         if (match.getInnings1() != null && match.getMatchStatus() != MatchStatus.UPCOMING) {
             builder.innings1(mapInnings(match.getInnings1(), match.getTeamAId(), teamAName, teamBName));
         }
@@ -98,7 +107,7 @@ public class MatchService {
                 .build();
     }
 
-    public void addMatch(AddMatchDTO dto) {
+    public void addMatch(AddMatchDTO dto, String creatorEmail) {
         // tournament is OPTIONAL
         String tournamentId = dto.getTournamentId() == null || dto.getTournamentId().isBlank()
                 ? null : dto.getTournamentId().trim();
@@ -136,6 +145,9 @@ public class MatchService {
 
         Match match = new Match();
         match.setTournamentId(tournamentId);
+        // the organizer who creates the match is its main organizer
+        match.setOwnerId(creatorEmail == null ? null
+                : profileRepository.findByEmail(creatorEmail).map(Profile::getId).orElse(null));
         match.setVenue(venue);
         match.setTeamAId(dto.getTeamAId());
         match.setTeamBId(dto.getTeamBId());
