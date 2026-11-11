@@ -80,6 +80,25 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.getMyProfile(auth.getName()));
     }
 
+    /** A player asks to become an organizer. Body: { "reason": "I run our club's tournaments" } */
+    @PostMapping("/me/organizer-request")
+    public ResponseEntity<?> requestOrganizer(@RequestBody Map<String, String> body, Authentication auth) {
+        try {
+            return ResponseEntity.ok(profileService.requestOrganizer(auth.getName(), body.get("reason")));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/me/organizer-request")
+    public ResponseEntity<?> cancelOrganizerRequest(Authentication auth) {
+        try {
+            return ResponseEntity.ok(profileService.cancelOrganizerRequest(auth.getName()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     /** A person edits THEIR OWN profile. There is no id in the URL on purpose: it is always "me". */
     @PutMapping("/me")
     public ResponseEntity<?> updateMe(@RequestBody UpdateProfileRequest request, Authentication auth) {

@@ -224,6 +224,9 @@ public class ProfileService {
                 .playingRole(player != null && player.getPlayingRole() != null
                         ? player.getPlayingRole().name() : null)
                 .image(player != null ? player.getImage() : null)
+                .organizerRequestStatus(profile.getOrganizerRequestStatus())
+                .organizerRequestReason(profile.getOrganizerRequestReason())
+                .organizerRequestAt(profile.getOrganizerRequestAt() == null ? null : profile.getOrganizerRequestAt().toString())
                 .build();
     }
 
@@ -241,7 +244,68 @@ public class ProfileService {
         }
 
         profile.setRole(newRoles);
+        if (newRoles.contains(Role.ORGANIZER) || newRoles.contains(Role.ADMIN)) clearOrganizerRequest(profile);
         return profileRepository.save(profile);
+    }
+
+    private static void clearOrganizerRequest(Profile profile) {
+        profile.setOrganizerRequestStatus(null);
+        profile.setOrganizerRequestReason(null);
+        profile.setOrganizerRequestAt(null);
+    }
+
+    // ------------------------------------------------ organizer requests
+
+    /** A player asks to become an organizer. An admin decides. */
+    public MyProfileResponse requestOrganizer(String email, String reason) {
+        Profile profile = profileRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+        Set<Role> roles = profile.getRole() == null ? Set.of() : profile.getRole();
+        if (roles.contains(Role.ORGANIZER) || roles.contains(Role.ADMIN)) {
+            throw new IllegalArgumentException("You are already an organizer");
+        }
+        if ("PENDING".equals(profile.getOrganizerRequestStatus())) {
+            throw new IllegalArgumentException("Your request is already waiting for an admin");
+        }
+        String r = reason == null ? "" : reason.trim();
+        if (r.length() < 5) throw new IllegalArgumentException("Tell the admin why you need organizer access (at least 5 characters)");
+        if (r.length() > 300) throw new IllegalArgumentException("The reason is too long (300 characters at most)");
+
+        profile.setOrganizerRequestStatus("PENDING");
+        profile.setOrganizerRequestReason(r);
+        profile.setOrganizerRequestAt(java.time.LocalDateTime.now());
+        profileRepository.save(profile);
+        return toResponse(profile);
+    }
+
+    public MyProfileResponse cancelOrganizerRequest(String email) {
+        Profile profile = profileRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+        clearOrganizerRequest(profile);
+        profileRepository.save(profile);
+        return toResponse(profile);
+    }
+
+    /** ADMIN: approve = the person becomes ORGANIZER (and stays PLAYER). */
+    public MyProfileResponse approveOrganizer(String profileId) {
+        Profile profile = profileRepository.findById(profileId)
+                .orElseThrow(() -> new NoSuchElementException("Profile not found"));
+        Set<Role> roles = new HashSet<>(profile.getRole() == null ? Set.<Role>of() : profile.getRole());
+        roles.add(Role.PLAYER);
+        roles.add(Role.ORGANIZER);
+        profile.setRole(roles);
+        clearOrganizerRequest(profile);
+        profileRepository.save(profile);
+        return toResponse(profile);
+    }
+
+    /** ADMIN: reject = stays a player; the person sees it was rejected and may ask again later. */
+    public MyProfileResponse rejectOrganizer(String profileId) {
+        Profile profile = profileRepository.findById(profileId)
+                .orElseThrow(() -> new NoSuchElementException("Profile not found"));
+        profile.setOrganizerRequestStatus("REJECTED");
+        profileRepository.save(profile);
+        return toResponse(profile);
     }
 
 }

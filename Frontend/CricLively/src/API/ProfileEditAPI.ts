@@ -26,3 +26,18 @@ export const adminUpdateInfo = (profileId: string, info: PersonalInfo) =>
 
 export const adminUpdateRoles = (profileId: string, roles: Role[]) =>
   api(`/admin/profiles/${profileId}/roles`, { method: "PUT", body: { roles } });
+
+// ---- "I want to be an organizer"
+export const requestOrganizer = (reason: string) =>
+  api<MyProfile>("/profile/me/organizer-request", { method: "POST", body: { reason } });
+
+export const cancelOrganizerRequest = () =>
+  api<MyProfile>("/profile/me/organizer-request", { method: "DELETE" });
+
+export const adminOrganizerRequests = () => api<MyProfile[]>("/admin/organizer-requests");
+
+export const adminApproveOrganizer = (profileId: string) =>
+  api<MyProfile>(`/admin/organizer-requests/${profileId}/approve`, { method: "POST" });
+
+export const adminRejectOrganizer = (profileId: string) =>
+  api<MyProfile>(`/admin/organizer-requests/${profileId}/reject`, { method: "POST" });

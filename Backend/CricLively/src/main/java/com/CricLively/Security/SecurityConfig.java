@@ -16,6 +16,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import com.CricLively.Repository.ProfileRepository;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -31,6 +33,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final ProfileDetailService userDetailService;
+    private final ProfileRepository profileRepository;
 
     /** Where the React app runs. Change it in application.properties (app.cors.allowed-origin), several origins: comma separated. */
     @Value("${app.cors.allowed-origin:http://localhost:5173}")
@@ -68,7 +71,7 @@ public class SecurityConfig {
 
                         // ---------- 4. EVERY signed-in person: view + own profile ----------
                         .requestMatchers("/ws/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN") // live score connection
-                        .requestMatchers("/profile/me").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                        .requestMatchers("/profile/me", "/profile/me/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/player/*/playerInfo")
                                 .hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
                         // SCOREBOARD: GET /matches/{id}/scoreboard and /balls are covered by "/matches/**" below
@@ -85,6 +88,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .httpBasic(AbstractHttpConfigurer::disable)
+                .addFilterAfter(new RoleRefreshFilter(profileRepository), SecurityContextHolderFilter.class)
 //                .httpBasic(Customizer.withDefaults())
                 .userDetailsService(userDetailService)
                 .build();

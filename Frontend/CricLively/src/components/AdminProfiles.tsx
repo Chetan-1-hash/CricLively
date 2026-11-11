@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
-import { adminListProfiles } from "../API/ProfileEditAPI";
+import { adminListProfiles, adminApproveOrganizer, adminRejectOrganizer } from "../API/ProfileEditAPI";
+import { toast } from "../hooks/use-toast";
 import type { MyProfile } from "../lib/auth";
 
 // ADMIN ONLY page (guarded in App.tsx and again by the server).
@@ -19,6 +20,18 @@ export default function AdminProfiles() {
       .catch((e: Error) => setError(e.message || "Could not load users"))
       .finally(() => setLoading(false));
   }, []);
+
+  const decide = async (p: MyProfile, approve: boolean) => {
+    try {
+      const updated = approve ? await adminApproveOrganizer(p.profileId) : await adminRejectOrganizer(p.profileId);
+      setProfiles((list) => list.map((x) => (x.profileId === updated.profileId ? updated : x)));
+      toast({ title: approve ? "Organizer access approved" : "Request rejected", description: p.email });
+    } catch (e) {
+      toast({ title: "Could not save", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const pending = profiles.filter((p) => p.organizerRequestStatus === "PENDING");
 
   const nameOf = (p: MyProfile) =>
     [p.firstName, p.middleName, p.lastName].filter(Boolean).join(" ") || "(no player profile)";
@@ -42,6 +55,31 @@ export default function AdminProfiles() {
           className="w-full max-w-4xl bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl"
         >
           <h1 className="text-3xl font-bold text-foreground text-center mb-6">Manage users</h1>
+
+          {pending.length > 0 && (
+            <div className="mb-6 rounded-2xl border border-yellow-500/60 bg-yellow-500/10 p-4">
+              <h2 className="font-semibold text-foreground mb-3">Organizer requests ({pending.length})</h2>
+              <div className="space-y-3">
+                {pending.map((p) => (
+                  <div key={p.profileId} className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-foreground text-sm">{nameOf(p)}</p>
+                      <p className="text-xs text-foreground/60">{p.email}</p>
+                      <p className="text-xs text-foreground/80 mt-1">"{p.organizerRequestReason}"</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => decide(p, true)} className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                        Approve
+                      </button>
+                      <button onClick={() => decide(p, false)} className="px-4 py-1.5 rounded-full border-2 border-red-600 text-red-600 text-xs font-semibold">
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <input
             value={search}
@@ -68,6 +106,11 @@ export default function AdminProfiles() {
                     {p.email} · {p.mobileNumber ?? "no mobile"}
                   </p>
                   <div className="flex gap-2 mt-2">
+                    {p.organizerRequestStatus === "PENDING" && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-yellow-500 text-black text-xs font-semibold">
+                        Wants organizer access
+                      </span>
+                    )}
                     {p.roles.map((r) => (
                       <span key={r} className="px-2.5 py-0.5 rounded-full bg-primary/20 text-xs font-semibold">
                         {r}

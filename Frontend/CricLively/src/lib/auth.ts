@@ -19,6 +19,9 @@ export interface MyProfile {
   bowlingStyle: string | null;
   playingRole: string | null;
   image: string | null;
+  organizerRequestStatus?: "PENDING" | "REJECTED" | null;
+  organizerRequestReason?: string | null;
+  organizerRequestAt?: string | null;
   message?: string | null;
 }
 

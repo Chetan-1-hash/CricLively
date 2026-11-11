@@ -30,5 +30,9 @@ public class MyProfileResponse {
     private String playingRole;
     private String image;             // image id -> shown at /images/{id}
 
+    private String organizerRequestStatus; // null, PENDING or REJECTED
+    private String organizerRequestReason;
+    private String organizerRequestAt;
+
     private String message;           // "Login Successful" on login, null otherwise
 }

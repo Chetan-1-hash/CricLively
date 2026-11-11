@@ -54,6 +54,32 @@ public class AdminController {
         }
     }
 
+    /** Everybody waiting for organizer access. */
+    @GetMapping("/organizer-requests")
+    public List<MyProfileResponse> organizerRequests() {
+        return profileService.getAllProfiles().stream()
+                .filter(p -> "PENDING".equals(p.getOrganizerRequestStatus()))
+                .toList();
+    }
+
+    @PostMapping("/organizer-requests/{profileId}/approve")
+    public ResponseEntity<?> approveOrganizer(@PathVariable String profileId) {
+        try {
+            return ResponseEntity.ok(profileService.approveOrganizer(profileId));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/organizer-requests/{profileId}/reject")
+    public ResponseEntity<?> rejectOrganizer(@PathVariable String profileId) {
+        try {
+            return ResponseEntity.ok(profileService.rejectOrganizer(profileId));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        }
+    }
+
     /**
      * Decide what a person is allowed to do.
      * Example body: { "roles": ["ORGANIZER"] }  -> becomes ORGANIZER + PLAYER

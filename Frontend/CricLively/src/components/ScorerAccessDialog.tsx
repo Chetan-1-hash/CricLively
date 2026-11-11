@@ -84,7 +84,7 @@ export default function ScorerAccessDialog({ matchId, onClose }: { matchId: stri
               <p className="font-semibold text-foreground">{access.ownerName ?? "Not set yet (the first organizer to start scoring)"}</p>
               {access.tournamentOrganizers.length > 0 && (
                 <p className="text-xs text-foreground/60 mt-2">
-                  Tournament organizers (always allowed): {access.tournamentOrganizers.map((o) => o.name).join(", ")}
+                  Tournament organizers (can always score and give access): {access.tournamentOrganizers.map((o) => o.name).join(", ")}
                 </p>
               )}
             </div>

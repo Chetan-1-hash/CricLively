@@ -6,7 +6,10 @@ import com.CricLively.DTO.TournamentDashboardResponse;
 import com.CricLively.Entities.Enums.TournamentStatus;
 import com.CricLively.Entities.Tournament;
 import com.CricLively.Entities.TournamentExtension;
+import com.CricLively.Repository.ProfileRepository;
 import com.CricLively.Repository.TournamentRepository;
+import com.CricLively.Entities.Enums.Role;
+import com.CricLively.Entities.Profile;
 import com.CricLively.Websocket.LiveScoreHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +30,7 @@ public class TournamentService {
     private final TournamentRepository tournamentRepository;
     private final MatchAccessService accessService;
     private final LiveScoreHandler liveScores;
+    private final ProfileRepository profileRepository;
 
     public List<TournamentDashboardResponse> getTournamentDashboard(Authentication auth) {
         MatchAccessService.Actor actor = accessService.actor(auth);
@@ -79,6 +83,16 @@ public class TournamentService {
 
         if (exists) {
             throw new RuntimeException("Tournament already exists with the same name, venue and dates.");
+        }
+
+        // only real organizers (or admins) can be tournament organizers
+        if (addTournament.getOrganizerIds() != null) {
+            for (String id : addTournament.getOrganizerIds()) {
+                Profile p = profileRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException("Organizer not found"));
+                boolean ok = p.getRole() != null && (p.getRole().contains(Role.ORGANIZER) || p.getRole().contains(Role.ADMIN));
+                if (!ok) throw new IllegalArgumentException("Only organizers can be tournament organizers. Ask an admin to approve them first.");
+            }
         }
 
         Tournament tournament = new Tournament();

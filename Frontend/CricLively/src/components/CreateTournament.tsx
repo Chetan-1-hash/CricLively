@@ -40,7 +40,7 @@ export default function CreateTournament() {
   const fetchOrganizerList = async () => {
     try {
       const resp = await ProfileListAPI();
-      setOrganizers(resp);
+      setOrganizers(resp.filter((o) => (o.role ?? []).includes("ORGANIZER"))); // players cannot be tournament organizers
     } catch (err: any) {
       toast({
         title: "Failed to load organizers",

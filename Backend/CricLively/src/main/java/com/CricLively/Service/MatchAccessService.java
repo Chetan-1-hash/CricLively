@@ -124,7 +124,7 @@ public class MatchAccessService {
         Tournament t = tournamentOf(match);
 
         List<MatchAccessResponse.Person> scorers = people(match.getScorerIds());
-        List<MatchAccessResponse.Person> tournamentOrganizers = t == null ? List.of() : people(t.getOrganizerIds());
+        List<MatchAccessResponse.Person> tournamentOrganizers = t == null ? List.of() : people(organizerIdsOnly(t.getOrganizerIds()));
         String ownerName = null;
         if (match.getOwnerId() != null) {
             List<MatchAccessResponse.Person> owner = people(Set.of(match.getOwnerId()));
@@ -167,6 +167,17 @@ public class MatchAccessService {
     }
 
     // ------------------------------------------------------------ helpers
+
+    /** Keeps only the ids of people who really are organizers/admins right now. */
+    private Set<String> organizerIdsOnly(Collection<String> profileIds) {
+        Set<String> out = new LinkedHashSet<>();
+        if (profileIds == null || profileIds.isEmpty()) return out;
+        profileRepository.findAllById(profileIds).forEach(p -> {
+            Set<Role> roles = p.getRole() == null ? Set.of() : p.getRole();
+            if (roles.contains(Role.ORGANIZER) || roles.contains(Role.ADMIN)) out.add(p.getId());
+        });
+        return out;
+    }
 
     private List<MatchAccessResponse.Person> people(Collection<String> profileIds) {
         if (profileIds == null || profileIds.isEmpty()) return List.of();

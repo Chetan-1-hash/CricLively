@@ -139,7 +139,10 @@ function buildInnings(
       },
     });
   }
-  return st.innings[0];
+  const result = st.innings[0];
+  // the server decides when an innings is over (it checks every ball), so both sides always agree
+  if (typeof api.isCompleted === "boolean") result.isComplete = api.isCompleted;
+  return result;
 }
 
 /** Everything the server knows -> the state the Scorer and Scoreboard pages draw. */

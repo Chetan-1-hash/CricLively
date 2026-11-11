@@ -5,6 +5,8 @@ import Navbar from "./Navbar";
 import { fetchMe } from "../API/PlayerAPI";
 import { API_URL } from "../API/client";
 import { saveSession, type MyProfile, type Role } from "../lib/auth";
+import { requestOrganizer, cancelOrganizerRequest } from "../API/ProfileEditAPI";
+import { toast } from "../hooks/use-toast";
 
 const ROLE_INFO: Record<Role, string> = {
   ADMIN: "Admin: full access to everything",
@@ -28,6 +30,42 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const [me, setMe] = useState<MyProfile | null>(null);
   const [error, setError] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const isOrganizer = !!me && (me.roles.includes("ORGANIZER") || me.roles.includes("ADMIN"));
+
+  const sendRequest = async () => {
+    if (reason.trim().length < 5) {
+      toast({ title: "Add a reason", description: "Tell the admin why you need organizer access.", variant: "destructive" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await requestOrganizer(reason.trim());
+      setMe(updated);
+      saveSession(updated);
+      setReason("");
+      toast({ title: "Request sent", description: "An admin will review it." });
+    } catch (e) {
+      toast({ title: "Could not send the request", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelRequest = async () => {
+    setBusy(true);
+    try {
+      const updated = await cancelOrganizerRequest();
+      setMe(updated);
+      saveSession(updated);
+    } catch (e) {
+      toast({ title: "Could not cancel", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     fetchMe()
@@ -112,6 +150,46 @@ export default function ProfilePage() {
                     </motion.button>
                   )}
                 </>
+              )}
+
+              {/* Organizer access: players ask, an admin approves */}
+              {!isOrganizer && (
+                <div className="mt-6 rounded-2xl bg-background/60 p-4">
+                  <h2 className="text-sm font-semibold text-foreground mb-1">Organizer access</h2>
+                  {me.organizerRequestStatus === "PENDING" ? (
+                    <>
+                      <p className="text-xs text-foreground/70 mb-2">
+                        Your request is waiting for an admin: "{me.organizerRequestReason}"
+                      </p>
+                      <button onClick={cancelRequest} disabled={busy} className="text-xs font-semibold underline text-foreground/70">
+                        Cancel request
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-foreground/70 mb-2">
+                        {me.organizerRequestStatus === "REJECTED"
+                          ? "Your last request was not approved. You can ask again."
+                          : "Organizers can create tournaments, teams and matches and score them. Ask an admin for access."}
+                      </p>
+                      <textarea
+                        value={reason}
+                        maxLength={300}
+                        rows={2}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Why do you need organizer access?"
+                        className="w-full mb-2 px-3 py-2 rounded-xl bg-background/70 border border-border text-sm"
+                      />
+                      <button
+                        onClick={sendRequest}
+                        disabled={busy}
+                        className="w-full py-2.5 bg-primary text-primary-foreground rounded-full text-sm font-semibold disabled:opacity-60"
+                      >
+                        {busy ? "Sending…" : "Request organizer access"}
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
 
               {/* You can edit YOUR OWN profile. (Admins edit other people in Manage Users.) */}

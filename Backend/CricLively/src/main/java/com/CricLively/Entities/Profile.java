@@ -27,4 +27,9 @@ public class Profile {
     private String playerId; // Null if user is just an admin
     @CreatedDate
     private LocalDateTime registrationDate;
+
+    // "I want to be an organizer": PENDING until an admin approves (role added) or rejects
+    private String organizerRequestStatus;   // null | PENDING | REJECTED
+    private String organizerRequestReason;
+    private LocalDateTime organizerRequestAt;
 }
