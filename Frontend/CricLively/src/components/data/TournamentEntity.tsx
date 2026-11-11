@@ -1,4 +1,4 @@
-export type TournamentStatus = "UPCOMING" | "LIVE" | "COMPLETED";
+export type TournamentStatus = "UPCOMING" | "LIVE" | "COMPLETED" | "FINISHED" | "ABANDONED";
 
 export class TournamentEntity {
   id!: string;
@@ -35,4 +35,16 @@ export class TournamentResponse {
   venue!: string;
   tournamentStatus!: TournamentStatus;
   teamIds: string[] = [];
+  originalEndDate?: string;
+  finished?: boolean; // today is after endDate
+  canExtend?: boolean; // may I extend it?
+  extensions?: TournamentExtensionInfo[];
+}
+
+export interface TournamentExtensionInfo {
+  previousEndDate: string;
+  newEndDate: string;
+  reason: string;
+  extendedByName?: string;
+  extendedAt?: string;
 }

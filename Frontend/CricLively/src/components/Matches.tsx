@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MatchResponse } from "./data/MatchEntity";
 import { getAllMatches } from "../API/MatchApi";
+import { minimalScores } from "../lib/matchScore";
 
 // Sample match data with status
 
@@ -151,6 +152,19 @@ export default function Matches() {
                 <h2 className="text-xl font-bold text-foreground mb-2">
                   {match.teamAName} Vs {match.teamBName}
                 </h2>
+                {(match.matchStatus === "LIVE" || match.matchStatus === "FINISHED") && (() => {
+                  const sc = minimalScores(match);
+                  return (
+                    <div className="my-2 space-y-0.5 text-sm font-semibold text-foreground">
+                      <div className="flex justify-between"><span>{match.teamAName}</span><span>{sc.teamA || "-"}</span></div>
+                      <div className="flex justify-between"><span>{match.teamBName}</span><span>{sc.teamB || "-"}</span></div>
+                      {match.resultText && <p className="text-xs text-accent pt-1">{match.resultText}</p>}
+                    </div>
+                  );
+                })()}
+                {match.tournamentFinished && match.matchStatus === "UPCOMING" && (
+                  <p className="text-xs text-red-600 mb-1">Tournament ended - scoring is locked</p>
+                )}
                 <p className="text-sm text-foreground/70">Date: {match.date}</p>
                 <p className="text-sm text-foreground/70">Time: {match.time}</p>
                 <p className="text-sm text-foreground/70">

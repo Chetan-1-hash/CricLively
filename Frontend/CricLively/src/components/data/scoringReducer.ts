@@ -203,7 +203,7 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
       }
 
       // Auto-complete innings if overs are up or all out
-      const allOut = updatedInnings.totalWickets >= 10;
+      const allOut = updatedInnings.totalWickets >= (updatedInnings.maxWickets ?? 10);
       const oversUp = updatedInnings.totalOvers >= state.maxOvers;
       const targetReached = updatedInnings.target !== undefined && updatedInnings.totalRuns >= updatedInnings.target;
       updatedInnings.isComplete = allOut || oversUp || targetReached;

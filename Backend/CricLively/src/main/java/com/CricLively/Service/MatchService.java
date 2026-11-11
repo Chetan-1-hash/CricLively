@@ -14,6 +14,7 @@ import com.CricLively.Websocket.LiveScoreHandler;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -84,7 +85,9 @@ public class MatchService {
                 .teamBName(teamBName)
                 .matchStatus(match.getMatchStatus())
                 .canScore(accessService.canScore(actor, match, tournament))
-                .canManage(accessService.canManage(actor, match, tournament));
+                .canManage(accessService.canManage(actor, match, tournament))
+                .tournamentFinished(tournament != null && tournament.finishedOn(LocalDate.now()))
+                .resultText(resultOf(match, teamAName, teamBName));
         if (match.getInnings1() != null && match.getMatchStatus() != MatchStatus.UPCOMING) {
             builder.innings1(mapInnings(match.getInnings1(), match.getTeamAId(), teamAName, teamBName));
         }
@@ -93,6 +96,28 @@ public class MatchService {
         }
 
         return builder.build();
+    }
+
+    /** One line result for a finished match, e.g. "Lions won by 5 runs". Null while not finished. */
+    private String resultOf(Match match, String teamAName, String teamBName) {
+        if (match.getMatchStatus() != MatchStatus.FINISHED) return null;
+        Innings i1 = match.getInnings1();
+        Innings i2 = match.getInnings2();
+        if (i1 == null || i2 == null || i1.getTotalRuns() == null || i2.getTotalRuns() == null) return null;
+
+        String firstTeam = match.getTeamAId().equals(i1.getBattingTeamId()) ? teamAName : teamBName;
+        String secondTeam = match.getTeamAId().equals(i2.getBattingTeamId()) ? teamAName : teamBName;
+        if (i2.getTotalRuns() > i1.getTotalRuns()) {
+            List<String> xi = match.getTeamAId().equals(i2.getBattingTeamId()) ? match.getPlayingXiA() : match.getPlayingXiB();
+            int maxWickets = xi == null || xi.size() < 2 ? 10 : xi.size() - 1;
+            int left = Math.max(maxWickets - (i2.getWicketsLost() == null ? 0 : i2.getWicketsLost()), 0);
+            return secondTeam + " won by " + left + (left == 1 ? " wicket" : " wickets");
+        }
+        if (i2.getTotalRuns() < i1.getTotalRuns()) {
+            int diff = i1.getTotalRuns() - i2.getTotalRuns();
+            return firstTeam + " won by " + diff + (diff == 1 ? " run" : " runs");
+        }
+        return "Match tied";
     }
 
     private MatchDashboardDTO.InningsSummaryDTO mapInnings(Innings innings, String teamAId, String teamAName, String teamBName) {
@@ -136,6 +161,18 @@ public class MatchService {
         }
 
         if (dto.getDate() == null) throw new IllegalArgumentException("Match date is required");
+
+        // a finished tournament takes no new matches until an organizer extends it
+        if (tournament != null) {
+            if (tournament.finishedOn(LocalDate.now())) {
+                throw new IllegalArgumentException("This tournament ended on " + tournament.effectiveEndDate()
+                        + ". Its organizer can extend it to add new matches.");
+            }
+            if (tournament.effectiveEndDate() != null && dto.getDate().isAfter(tournament.effectiveEndDate())) {
+                throw new IllegalArgumentException("The match date is after the tournament end date ("
+                        + tournament.effectiveEndDate() + "). Pick an earlier date or extend the tournament.");
+            }
+        }
 
         Integer overs = dto.getOversPerInnings();
         if (overs == null || overs < 1 || overs > 50) {

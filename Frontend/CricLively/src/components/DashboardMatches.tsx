@@ -10,15 +10,25 @@ import MatchCard from "../components/MatchCard";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MatchResponse } from "./data/MatchEntity";
 import { getTournamentMatches } from "../API/MatchApi";
+import { minimalScores } from "../lib/matchScore";
+import TournamentListAPI from "../API/TournamentAPI";
+import { toast } from "../hooks/use-toast";
+import ExtendTournamentDialog from "./ExtendTournamentDialog";
+import type { TournamentResponse } from "./data/TournamentEntity";
 
 
 export default function DashboardMatches() {
   const location = useLocation();
   // The router state is lost after a refresh or after creating a team / match, so fall back to the saved one
-  const tournamentDetails = useMemo(
+  const initialTournament = useMemo(
     () => location.state?.tournament ?? getSelectedTournament(),
     [location.state]
   );
+  // always show the latest dates / finished / extension info from the server
+  const [fresh, setFresh] = useState<TournamentResponse | null>(null);
+  const tournamentDetails: (TournamentResponse & { coverImage?: string }) | null =
+    fresh && initialTournament && fresh.id === initialTournament.id ? fresh : initialTournament;
+  const [extendOpen, setExtendOpen] = useState(false);
 
   const navigate = useNavigate();
   const organizer = canOrganize(); // only organizers/admins see the create menu
@@ -33,14 +43,34 @@ export default function DashboardMatches() {
     "LIVE" | "UPCOMING" | "FINISHED" | "ABANDONED"
   >("LIVE");
 
+  const loadTournament = async () => {
+    if (!initialTournament) return;
+    try {
+      const list = await TournamentListAPI();
+      const mine = list.find((t) => t.id === initialTournament.id);
+      if (mine) setFresh(mine);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     if (!tournamentDetails) return;
     saveSelectedTournament(tournamentDetails);
     loadAllMatches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentDetails]);
 
+  useEffect(() => {
+    loadTournament();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTournament?.id]);
+
   // scores and statuses update by themselves
-  useLiveUpdates("*", () => loadAllMatches());
+  useLiveUpdates("*", () => {
+    loadAllMatches();
+    loadTournament();
+  });
 
   const loadAllMatches = async () => {
     if (!tournamentDetails) return;
@@ -60,6 +90,15 @@ export default function DashboardMatches() {
 
   const handleActionClick = (action: string) => {
     setDropdownOpen(false);
+    if (!tournamentDetails) return;
+    if (tournamentDetails.finished && (action === "New Match")) {
+      toast({
+        title: "Tournament has ended",
+        description: `It ended on ${tournamentDetails.endDate}. Extend the tournament to add new matches.`,
+        variant: "destructive",
+      });
+      return;
+    }
     if (action === "New Match") {
       navigate(`/matchesDashboard/createMatch`, {
         state: {
@@ -103,6 +142,17 @@ export default function DashboardMatches() {
           onClose={() => {
             setAccessMatchId(null);
             loadAllMatches();
+          }}
+        />
+      )}
+
+      {extendOpen && tournamentDetails && (
+        <ExtendTournamentDialog
+          tournament={tournamentDetails}
+          onClose={() => setExtendOpen(false)}
+          onDone={(t) => {
+            setFresh(t);
+            setExtendOpen(false);
           }}
         />
       )}
@@ -161,6 +211,47 @@ export default function DashboardMatches() {
 
         {/* DASHBOARD */}
         <section className="max-w-7xl mx-auto px-4 py-10">
+          {tournamentDetails.finished && (
+            <div className="mb-6 rounded-2xl border border-red-600/40 bg-red-600/10 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-foreground">This tournament ended on {tournamentDetails.endDate}</p>
+                <p className="text-sm text-foreground/70">
+                  New matches and new scoring are locked. Running matches can still be closed.
+                </p>
+              </div>
+              {tournamentDetails.canExtend && (
+                <button
+                  onClick={() => setExtendOpen(true)}
+                  className="px-5 py-2 rounded-full bg-red-600 text-white text-sm font-semibold"
+                >
+                  Extend tournament
+                </button>
+              )}
+            </div>
+          )}
+          {!tournamentDetails.finished && tournamentDetails.canExtend && (
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={() => setExtendOpen(true)}
+                className="text-xs font-semibold text-foreground/70 hover:text-foreground underline"
+              >
+                Extend end date
+              </button>
+            </div>
+          )}
+          {(tournamentDetails.extensions ?? []).length > 0 && (
+            <div className="mb-6 rounded-2xl bg-card/70 px-5 py-4 text-sm">
+              <p className="font-semibold text-foreground mb-2">Extended timeline</p>
+              <ul className="space-y-1.5 text-foreground/80">
+                {(tournamentDetails.extensions ?? []).map((x, i) => (
+                  <li key={i}>
+                    {x.previousEndDate} → <b>{x.newEndDate}</b> · {x.reason}
+                    {x.extendedByName ? ` (by ${x.extendedByName})` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* TOP TABS */}
           <div className="flex gap-3 mb-8">
             {["matches", "points", "leaderboard"].map((tab) => (
@@ -222,16 +313,10 @@ export default function DashboardMatches() {
                         index={index}
                         team1={match.teamAName}
                         team2={match.teamBName}
-                        team1Score={
-                            match.firstInnings
-                                ? `${match.firstInnings.runs}/${match.firstInnings.wickets} (${match.firstInnings.overs})`
-                                : ""
-                        }
-                        team2Score={
-                            match.secondInnings
-                                ? `${match.secondInnings.runs}/${match.secondInnings.wickets} (${match.secondInnings.overs})`
-                                : ""
-                        }
+                        team1Score={minimalScores(match).teamA}
+                        team2Score={minimalScores(match).teamB}
+                        resultText={match.resultText}
+                        note={match.tournamentFinished && match.matchStatus === "UPCOMING" ? "Tournament ended - scoring is locked" : undefined}
                         status={match.matchStatus}
                         time={`${match.date} ${match.time}`}
                         venue={match.venue}

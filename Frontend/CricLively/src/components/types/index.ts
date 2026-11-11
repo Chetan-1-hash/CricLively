@@ -5,6 +5,8 @@ export interface MatchCardProps {
   team2: string;
   team1Score?: string;
   team2Score?: string;
+  resultText?: string | null; // shown under the scores once finished
+  note?: string;              // e.g. "Tournament ended"
   status: 'LIVE' | 'FINISHED' | 'ABANDONED'| 'UPCOMING';
   time?: string;
   venue: string;

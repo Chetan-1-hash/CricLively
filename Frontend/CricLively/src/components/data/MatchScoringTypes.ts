@@ -62,6 +62,7 @@ export interface InningsState {
   bowlingTeam: string;
   totalRuns: number;
   totalWickets: number;
+  maxWickets?: number; // batters in the playing team minus one (all out); default 10
   totalOvers: number; // completed overs
   ballsInCurrentOver: number; // 0-5
   currentOverNumber: number;

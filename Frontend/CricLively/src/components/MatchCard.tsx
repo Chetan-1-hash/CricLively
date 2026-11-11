@@ -6,6 +6,8 @@ export default function MatchCard({
   team2, 
   team1Score, 
   team2Score, 
+  resultText,
+  note,
   status, 
   time, 
   venue,
@@ -42,10 +44,7 @@ export default function MatchCard({
               LIVE
             </span>
           )}
-          {status === 'LIVE'}
-          {status === 'UPCOMING'}
-          {status === 'FINISHED'}
-          {status === 'ABANDONED'}
+          {status !== 'LIVE' && status}
         </span>
         {time && (
           <span className="text-sm text-foreground/70">{time}</span>
@@ -79,6 +78,11 @@ export default function MatchCard({
         </div>
       </div>
       
+      {resultText && (
+        <p className="mt-3 text-sm font-semibold text-accent">{resultText}</p>
+      )}
+      {note && <p className="mt-2 text-xs text-foreground/60">{note}</p>}
+
       {/* Venue */}
       <div className="mt-4 pt-4 border-t border-foreground/10">
         <p className="text-sm text-foreground/60 flex items-center gap-2">

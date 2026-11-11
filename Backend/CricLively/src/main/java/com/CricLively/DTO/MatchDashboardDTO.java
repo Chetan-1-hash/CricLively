@@ -26,6 +26,8 @@ public class MatchDashboardDTO {
     // For the person who asked: may they score this match / give others scoring access?
     private Boolean canScore;
     private Boolean canManage;
+    private Boolean tournamentFinished; // true = its tournament ended, no new scoring until it is extended
+    private String resultText;          // "X won by 5 runs" once the match is finished
 
     // Scores (Populated only if status is LIVE or FINISHED)
     private InningsSummaryDTO innings1;

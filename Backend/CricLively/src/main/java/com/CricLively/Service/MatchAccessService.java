@@ -44,6 +44,10 @@ public class MatchAccessService {
         final boolean organizer; // organizer OR admin
         final String profileId;
 
+        public String profileIdOrNull() {
+            return profileId;
+        }
+
         Actor(boolean admin, boolean organizer, String profileId) {
             this.admin = admin;
             this.organizer = organizer;
@@ -71,6 +75,24 @@ public class MatchAccessService {
             return t == null || t.getOrganizerIds() == null || t.getOrganizerIds().isEmpty();
         }
         return false;
+    }
+
+    /** Who may extend a tournament: admin, the organizer who made it, or its listed organizers. */
+    public boolean canExtendTournament(Actor a, Tournament t) {
+        if (a.admin) return true;
+        if (!a.organizer || a.profileId == null || t == null) return false;
+        if (a.profileId.equals(t.getCreatedBy())) return true;
+        if (t.getOrganizerIds() != null && t.getOrganizerIds().contains(a.profileId)) return true;
+        // an old tournament nobody owns: any organizer may extend it, so nobody is locked out
+        boolean noOrganizers = t.getOrganizerIds() == null || t.getOrganizerIds().isEmpty();
+        return t.getCreatedBy() == null && noOrganizers;
+    }
+
+    /** "First Last" of a profile, or its email. */
+    public String displayName(String profileId, Authentication auth) {
+        if (profileId == null) return auth == null ? null : auth.getName();
+        List<MatchAccessResponse.Person> p = people(Set.of(profileId));
+        return p.isEmpty() ? (auth == null ? null : auth.getName()) : p.get(0).getName();
     }
 
     public boolean canScore(Actor a, Match m, Tournament t) {

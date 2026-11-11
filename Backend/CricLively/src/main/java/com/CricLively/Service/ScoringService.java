@@ -8,6 +8,7 @@ import com.CricLively.Repository.MatchRepository;
 import com.CricLively.Repository.PlayerRepository;
 import com.CricLively.Repository.ProfileRepository;
 import com.CricLively.Repository.TeamRepository;
+import com.CricLively.Repository.TournamentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,7 @@ public class ScoringService {
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
     private final ProfileRepository profileRepository;
+    private final TournamentRepository tournamentRepository;
 
     // ------------------------------------------------------------ read
 
@@ -83,6 +85,13 @@ public class ScoringService {
         Match match = findMatch(matchId);
         if (match.getMatchStatus() != MatchStatus.UPCOMING) {
             throw new IllegalStateException("Match has already started or ended");
+        }
+        if (match.getTournamentId() != null) {
+            Tournament t = tournamentRepository.findTournamentById(match.getTournamentId());
+            if (t != null && t.finishedOn(java.time.LocalDate.now())) {
+                throw new IllegalStateException("This tournament ended on " + t.effectiveEndDate()
+                        + ", so scoring cannot start. Its organizer can extend the tournament.");
+            }
         }
         if (toss == null || toss.getWinnerId() == null || toss.getDecision() == null) {
             throw new IllegalArgumentException("Toss needs winnerId and decision");
@@ -283,7 +292,11 @@ public class ScoringService {
         innings.setTotalExtras(extras);
         innings.setWicketsLost(wickets);
         innings.setOversCompleted(legal / 6 + (legal % 6) / 10.0); // 14 balls -> 2.2
-        innings.setIsCompleted(wickets >= 10 || legal >= maxBalls || chaseDone);
+        // all out = every batter but one is out (a team of 8 is all out at 7 wickets)
+        List<String> battingXi = Objects.equals(innings.getBattingTeamId(), match.getTeamAId())
+                ? match.getPlayingXiA() : match.getPlayingXiB();
+        int maxWickets = battingXi == null || battingXi.size() < 2 ? 10 : battingXi.size() - 1;
+        innings.setIsCompleted(wickets >= maxWickets || legal >= maxBalls || chaseDone);
         matchRepository.save(match);
     }
 

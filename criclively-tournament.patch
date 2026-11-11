@@ -1,0 +1,1082 @@
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/DTO/ExtendTournamentRequest.java b/Backend/CricLively/src/main/java/com/CricLively/DTO/ExtendTournamentRequest.java
+new file mode 100644
+index 0000000..99491d6
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/DTO/ExtendTournamentRequest.java
+@@ -0,0 +1,11 @@
++package com.CricLively.DTO;
++
++import lombok.Data;
++
++import java.time.LocalDate;
++
++@Data
++public class ExtendTournamentRequest {
++    private LocalDate newEndDate;
++    private String reason;
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/DTO/MatchDashboardDTO.java b/Backend/CricLively/src/main/java/com/CricLively/DTO/MatchDashboardDTO.java
+index 1902e65..1ed26ce 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/DTO/MatchDashboardDTO.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/DTO/MatchDashboardDTO.java
+@@ -26,6 +26,8 @@ public class MatchDashboardDTO {
+     // For the person who asked: may they score this match / give others scoring access?
+     private Boolean canScore;
+     private Boolean canManage;
++    private Boolean tournamentFinished; // true = its tournament ended, no new scoring until it is extended
++    private String resultText;          // "X won by 5 runs" once the match is finished
+ 
+     // Scores (Populated only if status is LIVE or FINISHED)
+     private InningsSummaryDTO innings1;
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/DTO/TournamentDashboardResponse.java b/Backend/CricLively/src/main/java/com/CricLively/DTO/TournamentDashboardResponse.java
+index 68e3f1f..01158a8 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/DTO/TournamentDashboardResponse.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/DTO/TournamentDashboardResponse.java
+@@ -15,4 +15,18 @@ public class TournamentDashboardResponse {
+     private LocalDate endDate;
+     private String venue;
+     private TournamentStatus tournamentStatus;
++
++    private LocalDate originalEndDate;   // endDate above is the extended one when it was extended
++    private Boolean finished;            // true once today is after endDate
++    private Boolean canExtend;           // may the person asking extend it?
++    private List<ExtensionInfo> extensions;
++
++    @Data
++    public static class ExtensionInfo {
++        private LocalDate previousEndDate;
++        private LocalDate newEndDate;
++        private String reason;
++        private String extendedByName;
++        private String extendedAt;
++    }
+ }
+\ No newline at end of file
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Entities/Tournament.java b/Backend/CricLively/src/main/java/com/CricLively/Entities/Tournament.java
+index c9e074e..c279e0f 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Entities/Tournament.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Entities/Tournament.java
+@@ -23,4 +23,26 @@ public class Tournament {
+     private String venue;
+     private List<String> teamIds;
+     private List<PointsTableEntry> pointsTableEntry;
++
++    private String createdBy;                       // profile id of the organizer who made it
++    private List<TournamentExtension> extensions;   // every time the end date was moved
++
++    /** The end date that counts: the original one, or the latest extension. */
++    public LocalDate effectiveEndDate() {
++        LocalDate end = endDate;
++        if (extensions != null) {
++            for (TournamentExtension e : extensions) {
++                if (e.getNewEndDate() != null && (end == null || e.getNewEndDate().isAfter(end))) {
++                    end = e.getNewEndDate();
++                }
++            }
++        }
++        return end;
++    }
++
++    /** Finished = today is after the (extended) end date. */
++    public boolean finishedOn(LocalDate today) {
++        LocalDate end = effectiveEndDate();
++        return end != null && today.isAfter(end);
++    }
+ }
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Entities/TournamentExtension.java b/Backend/CricLively/src/main/java/com/CricLively/Entities/TournamentExtension.java
+new file mode 100644
+index 0000000..c814f02
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/Entities/TournamentExtension.java
+@@ -0,0 +1,17 @@
++package com.CricLively.Entities;
++
++import lombok.Data;
++
++import java.time.Instant;
++import java.time.LocalDate;
++
++/** One "the organizer made the tournament longer" record: kept forever so everybody can see why. */
++@Data
++public class TournamentExtension {
++    private LocalDate previousEndDate;
++    private LocalDate newEndDate;
++    private String reason;
++    private String extendedBy;      // profile id
++    private String extendedByName;
++    private Instant extendedAt;
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java b/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java
+index dd063b2..872b79d 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java
+@@ -2,6 +2,7 @@ package com.CricLively.RestController;
+ 
+ 
+ import com.CricLively.DTO.AddTournamentRequest;
++import com.CricLively.DTO.ExtendTournamentRequest;
+ import com.CricLively.DTO.TournamentDashboardResponse;
+ import com.CricLively.Entities.Tournament;
+ import com.CricLively.Service.ImageStorageService;
+@@ -10,12 +11,15 @@ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.RequestEntity;
+ import org.springframework.http.ResponseEntity;
++import org.springframework.security.access.AccessDeniedException;
++import org.springframework.security.core.Authentication;
+ import org.springframework.web.bind.annotation.*;
+ import org.springframework.web.multipart.MultipartFile;
+ import tools.jackson.databind.ObjectMapper;
+ 
+ import java.util.List;
+ import java.util.Map;
++import java.util.NoSuchElementException;
+ 
+ @RestController
+ @RequestMapping("/tournaments")
+@@ -27,15 +31,16 @@ public class TournamentController {
+ 
+ 
+     @GetMapping
+-    public List<TournamentDashboardResponse> getTournamentDashboard(){
+-        return tournamentService.getTournamentDashboard();
++    public List<TournamentDashboardResponse> getTournamentDashboard(Authentication auth){
++        return tournamentService.getTournamentDashboard(auth);
+     }
+ 
+ 
+     @PostMapping
+     public ResponseEntity<?> addTournament(
+             @RequestPart("data") String data,
+-            @RequestPart(value = "coverImage", required = false) MultipartFile coverImage
++            @RequestPart(value = "coverImage", required = false) MultipartFile coverImage,
++            Authentication auth
+     ) {
+         try {
+             ObjectMapper mapper = new ObjectMapper();
+@@ -46,7 +51,7 @@ public class TournamentController {
+                 tournament.setCoverImage(imageId);
+             }
+ 
+-            tournamentService.createTournament(tournament);
++            tournamentService.createTournament(tournament, auth);
+ 
+             return ResponseEntity.status(HttpStatus.CREATED)
+                     .body(Map.of(
+@@ -64,6 +69,21 @@ public class TournamentController {
+         }
+     }
+ 
++    /** Body: { "newEndDate": "2026-12-31", "reason": "Rain delayed the semi-finals" } */
++    @PostMapping("/{id}/extend")
++    public ResponseEntity<?> extend(@PathVariable String id, @RequestBody ExtendTournamentRequest request,
++                                    Authentication auth) {
++        try {
++            return ResponseEntity.ok(tournamentService.extend(id, request, auth));
++        } catch (AccessDeniedException e) {
++            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
++        } catch (NoSuchElementException e) {
++            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
++        } catch (IllegalArgumentException | IllegalStateException e) {
++            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
++        }
++    }
++
+     @GetMapping("/venue-exists")
+     public ResponseEntity<List<String>> getVenue(){
+         return ResponseEntity.ok(tournamentService.venuesList());
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java b/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java
+index 050a2c8..e17f62a 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java
+@@ -56,7 +56,7 @@ public class SecurityConfig {
+                         .requestMatchers(HttpMethod.POST, "/gallery/**").hasRole("ADMIN")
+ 
+                         // ---------- 3. ORGANIZER (and ADMIN): create and run things ----------
+-                        .requestMatchers(HttpMethod.POST, "/tournaments", "/matches", "/team/addTeam",
++                        .requestMatchers(HttpMethod.POST, "/tournaments", "/tournaments/*/extend", "/matches", "/team/addTeam",
+                                 "/images/upload").hasAnyRole("ORGANIZER", "ADMIN")
+                         .requestMatchers("/profile/getProfileList").hasAnyRole("ORGANIZER", "ADMIN")
+ 
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchAccessService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchAccessService.java
+index 8df9e28..85be8bd 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchAccessService.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchAccessService.java
+@@ -44,6 +44,10 @@ public class MatchAccessService {
+         final boolean organizer; // organizer OR admin
+         final String profileId;
+ 
++        public String profileIdOrNull() {
++            return profileId;
++        }
++
+         Actor(boolean admin, boolean organizer, String profileId) {
+             this.admin = admin;
+             this.organizer = organizer;
+@@ -73,6 +77,24 @@ public class MatchAccessService {
+         return false;
+     }
+ 
++    /** Who may extend a tournament: admin, the organizer who made it, or its listed organizers. */
++    public boolean canExtendTournament(Actor a, Tournament t) {
++        if (a.admin) return true;
++        if (!a.organizer || a.profileId == null || t == null) return false;
++        if (a.profileId.equals(t.getCreatedBy())) return true;
++        if (t.getOrganizerIds() != null && t.getOrganizerIds().contains(a.profileId)) return true;
++        // an old tournament nobody owns: any organizer may extend it, so nobody is locked out
++        boolean noOrganizers = t.getOrganizerIds() == null || t.getOrganizerIds().isEmpty();
++        return t.getCreatedBy() == null && noOrganizers;
++    }
++
++    /** "First Last" of a profile, or its email. */
++    public String displayName(String profileId, Authentication auth) {
++        if (profileId == null) return auth == null ? null : auth.getName();
++        List<MatchAccessResponse.Person> p = people(Set.of(profileId));
++        return p.isEmpty() ? (auth == null ? null : auth.getName()) : p.get(0).getName();
++    }
++
+     public boolean canScore(Actor a, Match m, Tournament t) {
+         if (canManage(a, m, t)) return true;
+         return a.organizer && a.profileId != null
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java
+index 31b9278..3a635be 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java
+@@ -14,6 +14,7 @@ import com.CricLively.Websocket.LiveScoreHandler;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.stereotype.Service;
+ 
++import java.time.LocalDate;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.NoSuchElementException;
+@@ -83,7 +84,9 @@ public class MatchService {
+                 .teamBName(teamBName)
+                 .matchStatus(match.getMatchStatus())
+                 .canScore(accessService.canScore(actor, match, tournament))
+-                .canManage(accessService.canManage(actor, match, tournament));
++                .canManage(accessService.canManage(actor, match, tournament))
++                .tournamentFinished(tournament != null && tournament.finishedOn(LocalDate.now()))
++                .resultText(resultOf(match, teamAName, teamBName));
+         if (match.getInnings1() != null && match.getMatchStatus() != MatchStatus.UPCOMING) {
+             builder.innings1(mapInnings(match.getInnings1(), match.getTeamAId(), teamAName, teamBName));
+         }
+@@ -94,6 +97,28 @@ public class MatchService {
+         return builder.build();
+     }
+ 
++    /** One line result for a finished match, e.g. "Lions won by 5 runs". Null while not finished. */
++    private String resultOf(Match match, String teamAName, String teamBName) {
++        if (match.getMatchStatus() != MatchStatus.FINISHED) return null;
++        Innings i1 = match.getInnings1();
++        Innings i2 = match.getInnings2();
++        if (i1 == null || i2 == null || i1.getTotalRuns() == null || i2.getTotalRuns() == null) return null;
++
++        String firstTeam = match.getTeamAId().equals(i1.getBattingTeamId()) ? teamAName : teamBName;
++        String secondTeam = match.getTeamAId().equals(i2.getBattingTeamId()) ? teamAName : teamBName;
++        if (i2.getTotalRuns() > i1.getTotalRuns()) {
++            List<String> xi = match.getTeamAId().equals(i2.getBattingTeamId()) ? match.getPlayingXiA() : match.getPlayingXiB();
++            int maxWickets = xi == null || xi.size() < 2 ? 10 : xi.size() - 1;
++            int left = Math.max(maxWickets - (i2.getWicketsLost() == null ? 0 : i2.getWicketsLost()), 0);
++            return secondTeam + " won by " + left + (left == 1 ? " wicket" : " wickets");
++        }
++        if (i2.getTotalRuns() < i1.getTotalRuns()) {
++            int diff = i1.getTotalRuns() - i2.getTotalRuns();
++            return firstTeam + " won by " + diff + (diff == 1 ? " run" : " runs");
++        }
++        return "Match tied";
++    }
++
+     private MatchDashboardDTO.InningsSummaryDTO mapInnings(Innings innings, String teamAId, String teamAName, String teamBName) {
+         if (innings == null) return null;
+ 
+@@ -136,6 +161,18 @@ public class MatchService {
+ 
+         if (dto.getDate() == null) throw new IllegalArgumentException("Match date is required");
+ 
++        // a finished tournament takes no new matches until an organizer extends it
++        if (tournament != null) {
++            if (tournament.finishedOn(LocalDate.now())) {
++                throw new IllegalArgumentException("This tournament ended on " + tournament.effectiveEndDate()
++                        + ". Its organizer can extend it to add new matches.");
++            }
++            if (tournament.effectiveEndDate() != null && dto.getDate().isAfter(tournament.effectiveEndDate())) {
++                throw new IllegalArgumentException("The match date is after the tournament end date ("
++                        + tournament.effectiveEndDate() + "). Pick an earlier date or extend the tournament.");
++            }
++        }
++
+         Integer overs = dto.getOversPerInnings();
+         if (overs == null || overs < 1 || overs > 50) {
+             throw new IllegalArgumentException("Overs per innings must be between 1 and 50");
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java
+index a5a9d2d..377e0bd 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java
+@@ -8,6 +8,7 @@ import com.CricLively.Repository.MatchRepository;
+ import com.CricLively.Repository.PlayerRepository;
+ import com.CricLively.Repository.ProfileRepository;
+ import com.CricLively.Repository.TeamRepository;
++import com.CricLively.Repository.TournamentRepository;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.stereotype.Service;
+ 
+@@ -33,6 +34,7 @@ public class ScoringService {
+     private final TeamRepository teamRepository;
+     private final PlayerRepository playerRepository;
+     private final ProfileRepository profileRepository;
++    private final TournamentRepository tournamentRepository;
+ 
+     // ------------------------------------------------------------ read
+ 
+@@ -84,6 +86,13 @@ public class ScoringService {
+         if (match.getMatchStatus() != MatchStatus.UPCOMING) {
+             throw new IllegalStateException("Match has already started or ended");
+         }
++        if (match.getTournamentId() != null) {
++            Tournament t = tournamentRepository.findTournamentById(match.getTournamentId());
++            if (t != null && t.finishedOn(java.time.LocalDate.now())) {
++                throw new IllegalStateException("This tournament ended on " + t.effectiveEndDate()
++                        + ", so scoring cannot start. Its organizer can extend the tournament.");
++            }
++        }
+         if (toss == null || toss.getWinnerId() == null || toss.getDecision() == null) {
+             throw new IllegalArgumentException("Toss needs winnerId and decision");
+         }
+@@ -283,7 +292,11 @@ public class ScoringService {
+         innings.setTotalExtras(extras);
+         innings.setWicketsLost(wickets);
+         innings.setOversCompleted(legal / 6 + (legal % 6) / 10.0); // 14 balls -> 2.2
+-        innings.setIsCompleted(wickets >= 10 || legal >= maxBalls || chaseDone);
++        // all out = every batter but one is out (a team of 8 is all out at 7 wickets)
++        List<String> battingXi = Objects.equals(innings.getBattingTeamId(), match.getTeamAId())
++                ? match.getPlayingXiA() : match.getPlayingXiB();
++        int maxWickets = battingXi == null || battingXi.size() < 2 ? 10 : battingXi.size() - 1;
++        innings.setIsCompleted(wickets >= maxWickets || legal >= maxBalls || chaseDone);
+         matchRepository.save(match);
+     }
+ 
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/TournamentService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/TournamentService.java
+index 6d3d91f..cf135f8 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Service/TournamentService.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/TournamentService.java
+@@ -1,48 +1,74 @@
+ package com.CricLively.Service;
+ 
+ import com.CricLively.DTO.AddTournamentRequest;
++import com.CricLively.DTO.ExtendTournamentRequest;
+ import com.CricLively.DTO.TournamentDashboardResponse;
+ import com.CricLively.Entities.Enums.TournamentStatus;
+ import com.CricLively.Entities.Tournament;
++import com.CricLively.Entities.TournamentExtension;
+ import com.CricLively.Repository.TournamentRepository;
++import com.CricLively.Websocket.LiveScoreHandler;
++import lombok.RequiredArgsConstructor;
++import org.springframework.security.access.AccessDeniedException;
++import org.springframework.security.core.Authentication;
+ import org.springframework.stereotype.Service;
+ 
++import java.time.Instant;
+ import java.time.LocalDate;
++import java.util.ArrayList;
+ import java.util.List;
++import java.util.NoSuchElementException;
+ import java.util.stream.Collectors;
+ 
+ @Service
++@RequiredArgsConstructor
+ public class TournamentService {
+ 
+     private final TournamentRepository tournamentRepository;
++    private final MatchAccessService accessService;
++    private final LiveScoreHandler liveScores;
+ 
+-    public TournamentService(TournamentRepository tournamentRepository){
+-        this.tournamentRepository = tournamentRepository;
+-    }
+-
+-    public List<TournamentDashboardResponse> getTournamentDashboard() {
++    public List<TournamentDashboardResponse> getTournamentDashboard(Authentication auth) {
++        MatchAccessService.Actor actor = accessService.actor(auth);
+         return tournamentRepository.findAll()
+                 .stream()
+-                .map(this::mapToDashboardResponse)
++                .map(t -> mapToDashboardResponse(t, actor))
+                 .collect(Collectors.toList());
+     }
+ 
+-    private TournamentDashboardResponse mapToDashboardResponse(Tournament tournament) {
++    private TournamentDashboardResponse mapToDashboardResponse(Tournament tournament, MatchAccessService.Actor actor) {
++        LocalDate today = LocalDate.now();
++        boolean finished = tournament.finishedOn(today);
++
+         TournamentDashboardResponse dto = new TournamentDashboardResponse();
+         dto.setId(tournament.getId());
+         dto.setName(tournament.getName());
+         dto.setCoverImage(tournament.getCoverImage());
+         dto.setStartDate(tournament.getStartDate());
+-        dto.setEndDate(tournament.getEndDate());
++        dto.setEndDate(tournament.effectiveEndDate());
++        dto.setOriginalEndDate(tournament.getEndDate());
+         dto.setVenue(tournament.getVenue());
+-//        dto.setTeamIds(tournament.getTeamIds());
+-        dto.setTournamentStatus(tournament.getTournamentStatus());
+-
++        dto.setFinished(finished);
++        dto.setTournamentStatus(finished ? TournamentStatus.FINISHED : tournament.getTournamentStatus());
++        dto.setCanExtend(accessService.canExtendTournament(actor, tournament));
++
++        List<TournamentDashboardResponse.ExtensionInfo> list = new ArrayList<>();
++        if (tournament.getExtensions() != null) {
++            for (TournamentExtension e : tournament.getExtensions()) {
++                TournamentDashboardResponse.ExtensionInfo info = new TournamentDashboardResponse.ExtensionInfo();
++                info.setPreviousEndDate(e.getPreviousEndDate());
++                info.setNewEndDate(e.getNewEndDate());
++                info.setReason(e.getReason());
++                info.setExtendedByName(e.getExtendedByName());
++                info.setExtendedAt(e.getExtendedAt() == null ? null : e.getExtendedAt().toString());
++                list.add(info);
++            }
++        }
++        dto.setExtensions(list);
+         return dto;
+     }
+ 
+-
+-    public void createTournament(AddTournamentRequest addTournament){
++    public void createTournament(AddTournamentRequest addTournament, Authentication auth){
+ 
+         boolean exists = tournamentRepository.existsByNameAndVenueAndStartDateAndEndDate(
+                 addTournament.getName(),
+@@ -63,6 +89,7 @@ public class TournamentService {
+         tournament.setStartDate(addTournament.getStartDate());
+         tournament.setEndDate(addTournament.getEndDate());
+         tournament.setVenue(addTournament.getVenue());
++        tournament.setCreatedBy(accessService.actor(auth).profileIdOrNull()); // who made it = who may extend it
+         LocalDate today = LocalDate.now();
+ 
+ 
+@@ -74,6 +101,64 @@ public class TournamentService {
+         tournamentRepository.save(tournament);
+     }
+ 
++    /**
++     * An organizer keeps a finished (or about to finish) tournament going.
++     * A new end date and a reason are required; both are saved in the tournament's history.
++     */
++    public TournamentDashboardResponse extend(String tournamentId, ExtendTournamentRequest req, Authentication auth) {
++        Tournament t = tournamentRepository.findTournamentById(tournamentId);
++        if (t == null) throw new NoSuchElementException("Tournament not found");
++
++        MatchAccessService.Actor actor = accessService.actor(auth);
++        if (!accessService.canExtendTournament(actor, t)) {
++            throw new AccessDeniedException("Only this tournament's organizers can extend it");
++        }
++
++        String reason = req == null || req.getReason() == null ? "" : req.getReason().trim();
++        if (reason.length() < 5) throw new IllegalArgumentException("Write the reason for the extension (at least 5 characters)");
++        if (reason.length() > 300) throw new IllegalArgumentException("The reason is too long (300 characters at most)");
++
++        LocalDate newEnd = req == null ? null : req.getNewEndDate();
++        if (newEnd == null) throw new IllegalArgumentException("Choose the new end date");
++
++        LocalDate today = LocalDate.now();
++        LocalDate currentEnd = t.effectiveEndDate();
++        if (currentEnd != null && !newEnd.isAfter(currentEnd)) {
++            throw new IllegalArgumentException("The new end date must be after the current end date (" + currentEnd + ")");
++        }
++        if (newEnd.isBefore(today)) {
++            throw new IllegalArgumentException("The new end date must be today or later, otherwise the tournament is still finished");
++        }
++        if (newEnd.isAfter(today.plusYears(1))) {
++            throw new IllegalArgumentException("The new end date can be at most one year from today");
++        }
++
++        TournamentExtension e = new TournamentExtension();
++        e.setPreviousEndDate(currentEnd);
++        e.setNewEndDate(newEnd);
++        e.setReason(reason);
++        e.setExtendedBy(actor.profileIdOrNull());
++        e.setExtendedByName(accessService.displayName(actor.profileIdOrNull(), auth));
++        e.setExtendedAt(Instant.now());
++
++        List<TournamentExtension> list = t.getExtensions() == null ? new ArrayList<>() : new ArrayList<>(t.getExtensions());
++        list.add(e);
++        t.setExtensions(list);
++        t.setTournamentStatus(t.getStartDate() != null && today.isBefore(t.getStartDate())
++                ? TournamentStatus.UPCOMING : TournamentStatus.LIVE);
++        tournamentRepository.save(t);
++
++        liveScores.publishAll(); // lists unlock without a refresh
++        return mapToDashboardResponse(t, actor);
++    }
++
++    /** True when the tournament exists and its (extended) end date is in the past. */
++    public boolean isFinished(String tournamentId) {
++        if (tournamentId == null) return false;
++        Tournament t = tournamentRepository.findTournamentById(tournamentId);
++        return t != null && t.finishedOn(LocalDate.now());
++    }
++
+     public List<String> venuesList(){
+         return tournamentRepository.findAll().stream()
+                 .map(Tournament::getVenue)
+diff --git a/Frontend/CricLively/src/API/TournamentAPI.ts b/Frontend/CricLively/src/API/TournamentAPI.ts
+index 314dae2..86ea0bf 100644
+--- a/Frontend/CricLively/src/API/TournamentAPI.ts
++++ b/Frontend/CricLively/src/API/TournamentAPI.ts
+@@ -1,4 +1,4 @@
+-import { API_URL } from "./client";
++import { API_URL, api } from "./client";
+ import type { AddTournamentRequest } from "../components/data/DTO";
+ import type { TournamentResponse } from "../components/data/TournamentEntity";
+ 
+@@ -79,4 +79,13 @@ export async function ExistByVenueAPI(): Promise<string[]>{
+   }
+ 
+   return await response.json();
+-}
+\ No newline at end of file
++}
++
++/** Organizer keeps a finished tournament going: a new end date and a reason are both required. */
++export async function extendTournamentAPI(
++  id: string,
++  body: { newEndDate: string; reason: string }
++): Promise<TournamentResponse> {
++  const t = await api<TournamentResponse>(`/tournaments/${id}/extend`, { method: "POST", body });
++  return { ...t, coverImage: t.coverImage ? `${API_URL}/images/${t.coverImage}` : "" };
++}
+diff --git a/Frontend/CricLively/src/components/DashboardMatches.tsx b/Frontend/CricLively/src/components/DashboardMatches.tsx
+index 80952f2..e58c43b 100644
+--- a/Frontend/CricLively/src/components/DashboardMatches.tsx
++++ b/Frontend/CricLively/src/components/DashboardMatches.tsx
+@@ -10,15 +10,25 @@ import MatchCard from "../components/MatchCard";
+ import { useLocation, useNavigate } from "react-router-dom";
+ import { MatchResponse } from "./data/MatchEntity";
+ import { getTournamentMatches } from "../API/MatchApi";
++import { minimalScores } from "../lib/matchScore";
++import TournamentListAPI from "../API/TournamentAPI";
++import { toast } from "../hooks/use-toast";
++import ExtendTournamentDialog from "./ExtendTournamentDialog";
++import type { TournamentResponse } from "./data/TournamentEntity";
+ 
+ 
+ export default function DashboardMatches() {
+   const location = useLocation();
+   // The router state is lost after a refresh or after creating a team / match, so fall back to the saved one
+-  const tournamentDetails = useMemo(
++  const initialTournament = useMemo(
+     () => location.state?.tournament ?? getSelectedTournament(),
+     [location.state]
+   );
++  // always show the latest dates / finished / extension info from the server
++  const [fresh, setFresh] = useState<TournamentResponse | null>(null);
++  const tournamentDetails: (TournamentResponse & { coverImage?: string }) | null =
++    fresh && initialTournament && fresh.id === initialTournament.id ? fresh : initialTournament;
++  const [extendOpen, setExtendOpen] = useState(false);
+ 
+   const navigate = useNavigate();
+   const organizer = canOrganize(); // only organizers/admins see the create menu
+@@ -33,14 +43,34 @@ export default function DashboardMatches() {
+     "LIVE" | "UPCOMING" | "FINISHED" | "ABANDONED"
+   >("LIVE");
+ 
++  const loadTournament = async () => {
++    if (!initialTournament) return;
++    try {
++      const list = await TournamentListAPI();
++      const mine = list.find((t) => t.id === initialTournament.id);
++      if (mine) setFresh(mine);
++    } catch (err) {
++      console.error(err);
++    }
++  };
++
+   useEffect(() => {
+     if (!tournamentDetails) return;
+     saveSelectedTournament(tournamentDetails);
+     loadAllMatches();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [tournamentDetails]);
+ 
++  useEffect(() => {
++    loadTournament();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [initialTournament?.id]);
++
+   // scores and statuses update by themselves
+-  useLiveUpdates("*", () => loadAllMatches());
++  useLiveUpdates("*", () => {
++    loadAllMatches();
++    loadTournament();
++  });
+ 
+   const loadAllMatches = async () => {
+     if (!tournamentDetails) return;
+@@ -60,6 +90,15 @@ export default function DashboardMatches() {
+ 
+   const handleActionClick = (action: string) => {
+     setDropdownOpen(false);
++    if (!tournamentDetails) return;
++    if (tournamentDetails.finished && (action === "New Match")) {
++      toast({
++        title: "Tournament has ended",
++        description: `It ended on ${tournamentDetails.endDate}. Extend the tournament to add new matches.`,
++        variant: "destructive",
++      });
++      return;
++    }
+     if (action === "New Match") {
+       navigate(`/matchesDashboard/createMatch`, {
+         state: {
+@@ -107,6 +146,17 @@ export default function DashboardMatches() {
+         />
+       )}
+ 
++      {extendOpen && tournamentDetails && (
++        <ExtendTournamentDialog
++          tournament={tournamentDetails}
++          onClose={() => setExtendOpen(false)}
++          onDone={(t) => {
++            setFresh(t);
++            setExtendOpen(false);
++          }}
++        />
++      )}
++
+       <section className="min-h-[100vh] relative py-20 bg-background/80">
+         {/* COVER SECTION */}
+         <section className="h-[30vh] relative bg-gradient-to-r from-green-700 to-green-500">
+@@ -161,6 +211,47 @@ export default function DashboardMatches() {
+ 
+         {/* DASHBOARD */}
+         <section className="max-w-7xl mx-auto px-4 py-10">
++          {tournamentDetails.finished && (
++            <div className="mb-6 rounded-2xl border border-red-600/40 bg-red-600/10 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
++              <div>
++                <p className="font-semibold text-foreground">This tournament ended on {tournamentDetails.endDate}</p>
++                <p className="text-sm text-foreground/70">
++                  New matches and new scoring are locked. Running matches can still be closed.
++                </p>
++              </div>
++              {tournamentDetails.canExtend && (
++                <button
++                  onClick={() => setExtendOpen(true)}
++                  className="px-5 py-2 rounded-full bg-red-600 text-white text-sm font-semibold"
++                >
++                  Extend tournament
++                </button>
++              )}
++            </div>
++          )}
++          {!tournamentDetails.finished && tournamentDetails.canExtend && (
++            <div className="mb-4 flex justify-end">
++              <button
++                onClick={() => setExtendOpen(true)}
++                className="text-xs font-semibold text-foreground/70 hover:text-foreground underline"
++              >
++                Extend end date
++              </button>
++            </div>
++          )}
++          {(tournamentDetails.extensions ?? []).length > 0 && (
++            <div className="mb-6 rounded-2xl bg-card/70 px-5 py-4 text-sm">
++              <p className="font-semibold text-foreground mb-2">Extended timeline</p>
++              <ul className="space-y-1.5 text-foreground/80">
++                {(tournamentDetails.extensions ?? []).map((x, i) => (
++                  <li key={i}>
++                    {x.previousEndDate} → <b>{x.newEndDate}</b> · {x.reason}
++                    {x.extendedByName ? ` (by ${x.extendedByName})` : ""}
++                  </li>
++                ))}
++              </ul>
++            </div>
++          )}
+           {/* TOP TABS */}
+           <div className="flex gap-3 mb-8">
+             {["matches", "points", "leaderboard"].map((tab) => (
+@@ -222,16 +313,10 @@ export default function DashboardMatches() {
+                         index={index}
+                         team1={match.teamAName}
+                         team2={match.teamBName}
+-                        team1Score={
+-                            match.firstInnings
+-                                ? `${match.firstInnings.runs}/${match.firstInnings.wickets} (${match.firstInnings.overs})`
+-                                : ""
+-                        }
+-                        team2Score={
+-                            match.secondInnings
+-                                ? `${match.secondInnings.runs}/${match.secondInnings.wickets} (${match.secondInnings.overs})`
+-                                : ""
+-                        }
++                        team1Score={minimalScores(match).teamA}
++                        team2Score={minimalScores(match).teamB}
++                        resultText={match.resultText}
++                        note={match.tournamentFinished && match.matchStatus === "UPCOMING" ? "Tournament ended - scoring is locked" : undefined}
+                         status={match.matchStatus}
+                         time={`${match.date} ${match.time}`}
+                         venue={match.venue}
+diff --git a/Frontend/CricLively/src/components/DashboardTournament.tsx b/Frontend/CricLively/src/components/DashboardTournament.tsx
+index 8fa5c80..a0e57a6 100644
+--- a/Frontend/CricLively/src/components/DashboardTournament.tsx
++++ b/Frontend/CricLively/src/components/DashboardTournament.tsx
+@@ -124,6 +124,16 @@ export default function DashboardTournament() {
+                 <p className="text-sm text-foreground/70 mb-1">
+                   {tournament.startDate} – {tournament.endDate}
+                 </p>
++                {tournament.finished && (
++                  <span className="inline-block mb-1 px-3 py-0.5 rounded-full text-xs font-bold bg-foreground/20 text-foreground">
++                    ENDED
++                  </span>
++                )}
++                {(tournament.extensions ?? []).length > 0 && (
++                  <span className="inline-block mb-1 ml-1 px-3 py-0.5 rounded-full text-xs font-bold bg-yellow-500 text-black">
++                    EXTENDED
++                  </span>
++                )}
+                 {/* <p className="text-sm text-foreground/70">
+                   {tournament.teamIds.length} Teams
+                 </p> */}
+diff --git a/Frontend/CricLively/src/components/ExtendTournamentDialog.tsx b/Frontend/CricLively/src/components/ExtendTournamentDialog.tsx
+new file mode 100644
+index 0000000..01a0af5
+--- /dev/null
++++ b/Frontend/CricLively/src/components/ExtendTournamentDialog.tsx
+@@ -0,0 +1,100 @@
++import { useState } from "react";
++import { motion } from "framer-motion";
++import { extendTournamentAPI } from "../API/TournamentAPI";
++import type { TournamentResponse } from "./data/TournamentEntity";
++import { toast } from "../hooks/use-toast";
++
++/**
++ * "Extend tournament": the organizer picks a new end date and says why.
++ * Both are saved in the tournament history and shown to everybody.
++ */
++export default function ExtendTournamentDialog({
++  tournament,
++  onClose,
++  onDone,
++}: {
++  tournament: TournamentResponse;
++  onClose: () => void;
++  onDone: (t: TournamentResponse) => void;
++}) {
++  const today = new Date().toISOString().slice(0, 10);
++  const [newEndDate, setNewEndDate] = useState("");
++  const [reason, setReason] = useState("");
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState("");
++
++  // the date must be after the current end date and not in the past
++  const minDate = tournament.endDate && tournament.endDate >= today ? tournament.endDate : today;
++
++  const submit = async () => {
++    setError("");
++    if (!newEndDate) return setError("Choose the new end date.");
++    if (newEndDate <= tournament.endDate) return setError(`The new end date must be after ${tournament.endDate}.`);
++    if (newEndDate < today) return setError("The new end date cannot be in the past.");
++    if (reason.trim().length < 5) return setError("Write the reason for the extension (at least 5 characters).");
++
++    setBusy(true);
++    try {
++      const t = await extendTournamentAPI(tournament.id, { newEndDate, reason: reason.trim() });
++      toast({ title: "Tournament extended", description: `New end date: ${t.endDate}` });
++      onDone(t);
++    } catch (e) {
++      setError((e as Error).message || "Could not extend the tournament.");
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  return (
++    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
++      <motion.div
++        className="bg-card rounded-3xl p-6 max-w-md w-full shadow-2xl"
++        initial={{ scale: 0.95, opacity: 0 }}
++        animate={{ scale: 1, opacity: 1 }}
++      >
++        <div className="flex justify-between items-center mb-1">
++          <h3 className="text-xl font-bold text-foreground">Extend tournament</h3>
++          <button onClick={onClose} className="text-foreground/50 hover:text-foreground">✕</button>
++        </div>
++        <p className="text-xs text-foreground/60 mb-4">
++          {tournament.name} · current end date <b>{tournament.endDate}</b>
++        </p>
++
++        <label className="block text-sm font-semibold text-foreground mb-1">New end date</label>
++        <input
++          type="date"
++          min={minDate}
++          value={newEndDate}
++          onChange={(e) => setNewEndDate(e.target.value)}
++          className="w-full mb-4 px-3.5 py-2.5 rounded-xl bg-background/70 border border-border text-sm"
++        />
++
++        <label className="block text-sm font-semibold text-foreground mb-1">Reason</label>
++        <textarea
++          value={reason}
++          maxLength={300}
++          rows={3}
++          onChange={(e) => setReason(e.target.value)}
++          placeholder="e.g. Semi-finals were delayed by rain"
++          className="w-full px-3.5 py-2.5 rounded-xl bg-background/70 border border-border text-sm"
++        />
++        <p className="text-xs text-foreground/50 text-right mb-3">{reason.length}/300</p>
++
++        {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
++
++        <div className="flex gap-2">
++          <button onClick={onClose} className="flex-1 py-2.5 rounded-full border-2 border-foreground/30 font-semibold text-foreground">
++            Cancel
++          </button>
++          <button
++            onClick={submit}
++            disabled={busy}
++            className="flex-1 py-2.5 rounded-full bg-red-600 text-white font-semibold disabled:opacity-60"
++          >
++            {busy ? "Saving…" : "Extend"}
++          </button>
++        </div>
++      </motion.div>
++    </div>
++  );
++}
+diff --git a/Frontend/CricLively/src/components/MatchCard.tsx b/Frontend/CricLively/src/components/MatchCard.tsx
+index 44302aa..873075a 100644
+--- a/Frontend/CricLively/src/components/MatchCard.tsx
++++ b/Frontend/CricLively/src/components/MatchCard.tsx
+@@ -6,6 +6,8 @@ export default function MatchCard({
+   team2, 
+   team1Score, 
+   team2Score, 
++  resultText,
++  note,
+   status, 
+   time, 
+   venue,
+@@ -42,10 +44,7 @@ export default function MatchCard({
+               LIVE
+             </span>
+           )}
+-          {status === 'LIVE'}
+-          {status === 'UPCOMING'}
+-          {status === 'FINISHED'}
+-          {status === 'ABANDONED'}
++          {status !== 'LIVE' && status}
+         </span>
+         {time && (
+           <span className="text-sm text-foreground/70">{time}</span>
+@@ -79,6 +78,11 @@ export default function MatchCard({
+         </div>
+       </div>
+       
++      {resultText && (
++        <p className="mt-3 text-sm font-semibold text-accent">{resultText}</p>
++      )}
++      {note && <p className="mt-2 text-xs text-foreground/60">{note}</p>}
++
+       {/* Venue */}
+       <div className="mt-4 pt-4 border-t border-foreground/10">
+         <p className="text-sm text-foreground/60 flex items-center gap-2">
+diff --git a/Frontend/CricLively/src/components/Matches.tsx b/Frontend/CricLively/src/components/Matches.tsx
+index aa7542f..acd5366 100644
+--- a/Frontend/CricLively/src/components/Matches.tsx
++++ b/Frontend/CricLively/src/components/Matches.tsx
+@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
+ import { useNavigate } from "react-router-dom";
+ import { MatchResponse } from "./data/MatchEntity";
+ import { getAllMatches } from "../API/MatchApi";
++import { minimalScores } from "../lib/matchScore";
+ 
+ // Sample match data with status
+ 
+@@ -151,6 +152,19 @@ export default function Matches() {
+                 <h2 className="text-xl font-bold text-foreground mb-2">
+                   {match.teamAName} Vs {match.teamBName}
+                 </h2>
++                {(match.matchStatus === "LIVE" || match.matchStatus === "FINISHED") && (() => {
++                  const sc = minimalScores(match);
++                  return (
++                    <div className="my-2 space-y-0.5 text-sm font-semibold text-foreground">
++                      <div className="flex justify-between"><span>{match.teamAName}</span><span>{sc.teamA || "-"}</span></div>
++                      <div className="flex justify-between"><span>{match.teamBName}</span><span>{sc.teamB || "-"}</span></div>
++                      {match.resultText && <p className="text-xs text-accent pt-1">{match.resultText}</p>}
++                    </div>
++                  );
++                })()}
++                {match.tournamentFinished && match.matchStatus === "UPCOMING" && (
++                  <p className="text-xs text-red-600 mb-1">Tournament ended - scoring is locked</p>
++                )}
+                 <p className="text-sm text-foreground/70">Date: {match.date}</p>
+                 <p className="text-sm text-foreground/70">Time: {match.time}</p>
+                 <p className="text-sm text-foreground/70">
+diff --git a/Frontend/CricLively/src/components/Scorer.tsx b/Frontend/CricLively/src/components/Scorer.tsx
+index 23068fd..12b1e47 100644
+--- a/Frontend/CricLively/src/components/Scorer.tsx
++++ b/Frontend/CricLively/src/components/Scorer.tsx
+@@ -311,7 +311,8 @@ export default function Scorer() {
+       return;
+     }
+     // a wicket needs the next batsman first, and the ball is saved ONCE when he is picked
+-    if (isWicket && innings.totalWickets < 9 && availableBatsmen.length > 0) {
++    // (even when only ONE batter is left to come in; no picker only when this wicket ends the innings)
++    if (isWicket && innings.totalWickets + 1 < (innings.maxWickets ?? 10) && availableBatsmen.length > 0) {
+       setShowNewBatsmanPicker(true);
+       return;
+     }
+diff --git a/Frontend/CricLively/src/components/data/MatchEntity.tsx b/Frontend/CricLively/src/components/data/MatchEntity.tsx
+index 94b72e3..5eb843c 100644
+--- a/Frontend/CricLively/src/components/data/MatchEntity.tsx
++++ b/Frontend/CricLively/src/components/data/MatchEntity.tsx
+@@ -53,8 +53,11 @@ export class MatchResponse {
+     canScore?: boolean;  // may I score this match?
+     canManage?: boolean; // may I give others scoring access?
+ 
+-    firstInnings?: InningsSummaryDTO;
+-    secondInnings?: InningsSummaryDTO;
++    tournamentFinished?: boolean; // its tournament ended: no new scoring until extended
++    resultText?: string | null;   // "X won by 5 runs"
++
++    innings1?: InningsSummaryDTO;
++    innings2?: InningsSummaryDTO;
+ }
+ 
+ export class AddMatchDTO {
+diff --git a/Frontend/CricLively/src/components/data/MatchScoringTypes.ts b/Frontend/CricLively/src/components/data/MatchScoringTypes.ts
+index 03fafa4..dfccedd 100644
+--- a/Frontend/CricLively/src/components/data/MatchScoringTypes.ts
++++ b/Frontend/CricLively/src/components/data/MatchScoringTypes.ts
+@@ -62,6 +62,7 @@ export interface InningsState {
+   bowlingTeam: string;
+   totalRuns: number;
+   totalWickets: number;
++  maxWickets?: number; // batters in the playing team minus one (all out); default 10
+   totalOvers: number; // completed overs
+   ballsInCurrentOver: number; // 0-5
+   currentOverNumber: number;
+diff --git a/Frontend/CricLively/src/components/data/TournamentEntity.tsx b/Frontend/CricLively/src/components/data/TournamentEntity.tsx
+index 1efb20e..e3a8e83 100644
+--- a/Frontend/CricLively/src/components/data/TournamentEntity.tsx
++++ b/Frontend/CricLively/src/components/data/TournamentEntity.tsx
+@@ -1,4 +1,4 @@
+-export type TournamentStatus = "UPCOMING" | "LIVE" | "COMPLETED";
++export type TournamentStatus = "UPCOMING" | "LIVE" | "COMPLETED" | "FINISHED" | "ABANDONED";
+ 
+ export class TournamentEntity {
+   id!: string;
+@@ -35,4 +35,16 @@ export class TournamentResponse {
+   venue!: string;
+   tournamentStatus!: TournamentStatus;
+   teamIds: string[] = [];
++  originalEndDate?: string;
++  finished?: boolean; // today is after endDate
++  canExtend?: boolean; // may I extend it?
++  extensions?: TournamentExtensionInfo[];
++}
++
++export interface TournamentExtensionInfo {
++  previousEndDate: string;
++  newEndDate: string;
++  reason: string;
++  extendedByName?: string;
++  extendedAt?: string;
+ }
+diff --git a/Frontend/CricLively/src/components/data/scoringReducer.ts b/Frontend/CricLively/src/components/data/scoringReducer.ts
+index 857d236..f94ef45 100644
+--- a/Frontend/CricLively/src/components/data/scoringReducer.ts
++++ b/Frontend/CricLively/src/components/data/scoringReducer.ts
+@@ -203,7 +203,7 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
+       }
+ 
+       // Auto-complete innings if overs are up or all out
+-      const allOut = updatedInnings.totalWickets >= 10;
++      const allOut = updatedInnings.totalWickets >= (updatedInnings.maxWickets ?? 10);
+       const oversUp = updatedInnings.totalOvers >= state.maxOvers;
+       const targetReached = updatedInnings.target !== undefined && updatedInnings.totalRuns >= updatedInnings.target;
+       updatedInnings.isComplete = allOut || oversUp || targetReached;
+diff --git a/Frontend/CricLively/src/components/types/index.ts b/Frontend/CricLively/src/components/types/index.ts
+index acb1760..905b215 100644
+--- a/Frontend/CricLively/src/components/types/index.ts
++++ b/Frontend/CricLively/src/components/types/index.ts
+@@ -5,6 +5,8 @@ export interface MatchCardProps {
+   team2: string;
+   team1Score?: string;
+   team2Score?: string;
++  resultText?: string | null; // shown under the scores once finished
++  note?: string;              // e.g. "Tournament ended"
+   status: 'LIVE' | 'FINISHED' | 'ABANDONED'| 'UPCOMING';
+   time?: string;
+   venue: string;
+diff --git a/Frontend/CricLively/src/components/viewer.tsx b/Frontend/CricLively/src/components/viewer.tsx
+index a19d250..be22a98 100644
+--- a/Frontend/CricLively/src/components/viewer.tsx
++++ b/Frontend/CricLively/src/components/viewer.tsx
+@@ -81,7 +81,7 @@ export default function ViewerPage() {
+   let resultText: string | null = null;
+   if (state.status === "FINISHED" && secondInnings) {
+     if (secondInnings.totalRuns > firstInnings.totalRuns) {
+-      resultText = `${secondInnings.battingTeam} won by ${Math.max(10 - secondInnings.totalWickets, 0)} wickets`;
++      resultText = `${secondInnings.battingTeam} won by ${Math.max((secondInnings.maxWickets ?? 10) - secondInnings.totalWickets, 0)} wickets`;
+     } else if (secondInnings.totalRuns < firstInnings.totalRuns) {
+       resultText = `${firstInnings.battingTeam} won by ${firstInnings.totalRuns - secondInnings.totalRuns} runs`;
+     } else {
+diff --git a/Frontend/CricLively/src/lib/matchAccess.ts b/Frontend/CricLively/src/lib/matchAccess.ts
+index 995ab5c..2f423b1 100644
+--- a/Frontend/CricLively/src/lib/matchAccess.ts
++++ b/Frontend/CricLively/src/lib/matchAccess.ts
+@@ -9,6 +9,7 @@ import type { MatchStatus } from "../components/data/MatchEntity";
+ interface MatchRef {
+   matchId: string;
+   matchStatus: MatchStatus;
++  tournamentFinished?: boolean;
+ }
+ 
+ export function openScoreboard(match: MatchRef, navigate: NavigateFunction) {
+@@ -38,5 +39,13 @@ export function openScorer(match: MatchRef, navigate: NavigateFunction) {
+     });
+     return;
+   }
++  if (match.tournamentFinished && match.matchStatus === "UPCOMING") {
++    toast({
++      title: "Tournament has ended",
++      description: "Scoring cannot start. The tournament's organizer can extend it with a reason and a new end date.",
++      variant: "destructive",
++    });
++    return;
++  }
+   navigate(`/scorer/${match.matchId}`);
+ }
+diff --git a/Frontend/CricLively/src/lib/matchScore.ts b/Frontend/CricLively/src/lib/matchScore.ts
+new file mode 100644
+index 0000000..19b534c
+--- /dev/null
++++ b/Frontend/CricLively/src/lib/matchScore.ts
+@@ -0,0 +1,10 @@
++import type { MatchResponse, InningsSummaryDTO } from "../components/data/MatchEntity";
++
++const line = (i?: InningsSummaryDTO) => (i ? `${i.runs}/${i.wickets} (${i.overs})` : "");
++
++/** "120/4 (15.2)" for each team, matched by the batting team name. Empty text = has not batted. */
++export function minimalScores(m: MatchResponse): { teamA: string; teamB: string } {
++  const all = [m.innings1, m.innings2].filter(Boolean) as InningsSummaryDTO[];
++  const forTeam = (name: string) => line(all.find((i) => i.battingTeamName === name));
++  return { teamA: forTeam(m.teamAName), teamB: forTeam(m.teamBName) };
++}
+diff --git a/Frontend/CricLively/src/lib/scoreAdapter.ts b/Frontend/CricLively/src/lib/scoreAdapter.ts
+index 0a9ce4c..6d454ab 100644
+--- a/Frontend/CricLively/src/lib/scoreAdapter.ts
++++ b/Frontend/CricLively/src/lib/scoreAdapter.ts
+@@ -87,6 +87,10 @@ function buildInnings(
+     bowlingTeam: teamName(api.bowlingTeamId),
+     totalRuns: 0,
+     totalWickets: 0,
++    maxWickets: (() => {
++      const xi = (api.battingTeamId === sb.teamAId ? sb.playingA : sb.playingB) ?? [];
++      return xi.length >= 2 ? xi.length - 1 : 10;
++    })(),
+     totalOvers: 0,
+     ballsInCurrentOver: 0,
+     currentOverNumber: 1,

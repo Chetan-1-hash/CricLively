@@ -9,6 +9,7 @@ import type { MatchStatus } from "../components/data/MatchEntity";
 interface MatchRef {
   matchId: string;
   matchStatus: MatchStatus;
+  tournamentFinished?: boolean;
 }
 
 export function openScoreboard(match: MatchRef, navigate: NavigateFunction) {
@@ -35,6 +36,14 @@ export function openScorer(match: MatchRef, navigate: NavigateFunction) {
     toast({
       title: "Scoring is closed",
       description: `This match is ${match.matchStatus.toLowerCase()}.`,
+    });
+    return;
+  }
+  if (match.tournamentFinished && match.matchStatus === "UPCOMING") {
+    toast({
+      title: "Tournament has ended",
+      description: "Scoring cannot start. The tournament's organizer can extend it with a reason and a new end date.",
+      variant: "destructive",
     });
     return;
   }

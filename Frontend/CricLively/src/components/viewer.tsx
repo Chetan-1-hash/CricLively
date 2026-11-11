@@ -81,7 +81,7 @@ export default function ViewerPage() {
   let resultText: string | null = null;
   if (state.status === "FINISHED" && secondInnings) {
     if (secondInnings.totalRuns > firstInnings.totalRuns) {
-      resultText = `${secondInnings.battingTeam} won by ${Math.max(10 - secondInnings.totalWickets, 0)} wickets`;
+      resultText = `${secondInnings.battingTeam} won by ${Math.max((secondInnings.maxWickets ?? 10) - secondInnings.totalWickets, 0)} wickets`;
     } else if (secondInnings.totalRuns < firstInnings.totalRuns) {
       resultText = `${firstInnings.battingTeam} won by ${firstInnings.totalRuns - secondInnings.totalRuns} runs`;
     } else {

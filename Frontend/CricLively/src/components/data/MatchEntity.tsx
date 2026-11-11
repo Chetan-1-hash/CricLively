@@ -53,8 +53,11 @@ export class MatchResponse {
     canScore?: boolean;  // may I score this match?
     canManage?: boolean; // may I give others scoring access?
 
-    firstInnings?: InningsSummaryDTO;
-    secondInnings?: InningsSummaryDTO;
+    tournamentFinished?: boolean; // its tournament ended: no new scoring until extended
+    resultText?: string | null;   // "X won by 5 runs"
+
+    innings1?: InningsSummaryDTO;
+    innings2?: InningsSummaryDTO;
 }
 
 export class AddMatchDTO {

@@ -311,7 +311,8 @@ export default function Scorer() {
       return;
     }
     // a wicket needs the next batsman first, and the ball is saved ONCE when he is picked
-    if (isWicket && innings.totalWickets < 9 && availableBatsmen.length > 0) {
+    // (even when only ONE batter is left to come in; no picker only when this wicket ends the innings)
+    if (isWicket && innings.totalWickets + 1 < (innings.maxWickets ?? 10) && availableBatsmen.length > 0) {
       setShowNewBatsmanPicker(true);
       return;
     }

@@ -1,4 +1,4 @@
-import { API_URL } from "./client";
+import { API_URL, api } from "./client";
 import type { AddTournamentRequest } from "../components/data/DTO";
 import type { TournamentResponse } from "../components/data/TournamentEntity";
 
@@ -79,4 +79,13 @@ export async function ExistByVenueAPI(): Promise<string[]>{
   }
 
   return await response.json();
+}
+
+/** Organizer keeps a finished tournament going: a new end date and a reason are both required. */
+export async function extendTournamentAPI(
+  id: string,
+  body: { newEndDate: string; reason: string }
+): Promise<TournamentResponse> {
+  const t = await api<TournamentResponse>(`/tournaments/${id}/extend`, { method: "POST", body });
+  return { ...t, coverImage: t.coverImage ? `${API_URL}/images/${t.coverImage}` : "" };
 }

@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/gallery/**").hasRole("ADMIN")
 
                         // ---------- 3. ORGANIZER (and ADMIN): create and run things ----------
-                        .requestMatchers(HttpMethod.POST, "/tournaments", "/matches", "/team/addTeam",
+                        .requestMatchers(HttpMethod.POST, "/tournaments", "/tournaments/*/extend", "/matches", "/team/addTeam",
                                 "/images/upload").hasAnyRole("ORGANIZER", "ADMIN")
                         .requestMatchers("/profile/getProfileList").hasAnyRole("ORGANIZER", "ADMIN")
 

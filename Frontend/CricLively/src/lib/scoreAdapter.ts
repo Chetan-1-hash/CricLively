@@ -87,6 +87,10 @@ function buildInnings(
     bowlingTeam: teamName(api.bowlingTeamId),
     totalRuns: 0,
     totalWickets: 0,
+    maxWickets: (() => {
+      const xi = (api.battingTeamId === sb.teamAId ? sb.playingA : sb.playingB) ?? [];
+      return xi.length >= 2 ? xi.length - 1 : 10;
+    })(),
     totalOvers: 0,
     ballsInCurrentOver: 0,
     currentOverNumber: 1,

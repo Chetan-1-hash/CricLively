@@ -124,6 +124,16 @@ export default function DashboardTournament() {
                 <p className="text-sm text-foreground/70 mb-1">
                   {tournament.startDate} – {tournament.endDate}
                 </p>
+                {tournament.finished && (
+                  <span className="inline-block mb-1 px-3 py-0.5 rounded-full text-xs font-bold bg-foreground/20 text-foreground">
+                    ENDED
+                  </span>
+                )}
+                {(tournament.extensions ?? []).length > 0 && (
+                  <span className="inline-block mb-1 ml-1 px-3 py-0.5 rounded-full text-xs font-bold bg-yellow-500 text-black">
+                    EXTENDED
+                  </span>
+                )}
                 {/* <p className="text-sm text-foreground/70">
                   {tournament.teamIds.length} Teams
                 </p> */}
