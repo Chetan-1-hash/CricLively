@@ -62,7 +62,7 @@ export default async function TournamentListAPI(): Promise<TournamentResponse[]>
   // Map each tournament to include the full image URL
   const tournamentsWithImageUrl = tournaments.map(t => ({
     ...t,
-    coverImage: `${API_URL}/images/${t.coverImage}`
+    coverImage: t.coverImage ? `${API_URL}/images/${t.coverImage}` : "" // a tournament may have no cover
   }));
 
   return tournamentsWithImageUrl;

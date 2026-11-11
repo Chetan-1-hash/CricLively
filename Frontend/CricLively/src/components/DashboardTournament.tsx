@@ -104,12 +104,17 @@ export default function DashboardTournament() {
                 className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl hover:scale-105 transition-transform cursor-pointer"
               >
                 {/* Tournament image */}
-                <div className="w-full h-32 rounded-2xl overflow-hidden mb-4">
-                  <img
-                    src={tournament.coverImage}
-                    alt={tournament.name}
-                    className="w-full h-full object-contain"
-                  />
+                <div className="w-full h-32 rounded-2xl overflow-hidden mb-4 bg-foreground/10 flex items-center justify-center text-5xl">
+                  {tournament.coverImage ? (
+                    <img
+                      src={tournament.coverImage}
+                      alt={tournament.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => (e.currentTarget.style.display = "none")}
+                    />
+                  ) : (
+                    "🏆"
+                  )}
                 </div>
 
                 {/* Tournament info */}

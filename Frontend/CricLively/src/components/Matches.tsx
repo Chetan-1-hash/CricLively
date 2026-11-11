@@ -1,6 +1,7 @@
 import { canOrganize } from "../lib/auth";
 import { openScoreboard, openScorer } from "../lib/matchAccess";
 import ScorerAccessDialog from "./ScorerAccessDialog";
+import { useLiveUpdates } from "../lib/useLiveUpdates";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useEffect, useState } from "react";
@@ -23,6 +24,9 @@ export default function Matches() {
   useEffect(() => {
     loadAllMatches();
   },[]);
+
+  // scores and statuses update by themselves
+  useLiveUpdates("*", () => loadAllMatches());
 
   const loadAllMatches = async () => {
     try {

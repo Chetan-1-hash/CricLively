@@ -17,6 +17,7 @@ import { scoringReducer } from "./data/scoringReducer";
 import Navbar from "./Navbar";
 import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
 import LineupPanel from "./LineupPanel";
+import { useLiveUpdates } from "../lib/useLiveUpdates";
 import ScorerAccessDialog from "./ScorerAccessDialog";
 
 const WICKET_TYPES: WicketType[] = ["Bowled", "Caught", "LBW", "Run Out", "Stumped", "Hit Wicket", "Retired Hurt"];
@@ -110,6 +111,9 @@ export default function Scorer() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // another scorer / the main organizer changed something: show it without a refresh
+  useLiveUpdates(matchId ?? "", load);
 
   // Rebuild the score by replaying the saved balls
   const base = useMemo(() => (sb ? buildScoreState(sb) : null), [sb]);

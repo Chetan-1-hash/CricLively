@@ -1,7 +1,9 @@
 import { canOrganize } from "../lib/auth";
 import { openScoreboard, openScorer } from "../lib/matchAccess";
 import ScorerAccessDialog from "./ScorerAccessDialog";
-import { useEffect, useState } from "react";
+import { useLiveUpdates } from "../lib/useLiveUpdates";
+import { getSelectedTournament, saveSelectedTournament } from "../lib/selectedTournament";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../components/Navbar";
 import MatchCard from "../components/MatchCard";
@@ -12,7 +14,11 @@ import { getTournamentMatches } from "../API/MatchApi";
 
 export default function DashboardMatches() {
   const location = useLocation();
-  const tournamentDetails = location.state?.tournament;
+  // The router state is lost after a refresh or after creating a team / match, so fall back to the saved one
+  const tournamentDetails = useMemo(
+    () => location.state?.tournament ?? getSelectedTournament(),
+    [location.state]
+  );
 
   const navigate = useNavigate();
   const organizer = canOrganize(); // only organizers/admins see the create menu
@@ -29,10 +35,15 @@ export default function DashboardMatches() {
 
   useEffect(() => {
     if (!tournamentDetails) return;
+    saveSelectedTournament(tournamentDetails);
     loadAllMatches();
   }, [tournamentDetails]);
 
+  // scores and statuses update by themselves
+  useLiveUpdates("*", () => loadAllMatches());
+
   const loadAllMatches = async () => {
+    if (!tournamentDetails) return;
     try {
       const data = await getTournamentMatches(tournamentDetails.id);
       setMatches(data);
@@ -42,7 +53,7 @@ export default function DashboardMatches() {
   };
 
   const filteredMatches = matches.filter(
-    (m) => m.tournamentId === tournamentDetails.id && m.matchStatus === matchFilter
+    (m) => m.tournamentId === tournamentDetails?.id && m.matchStatus === matchFilter
 );
 
   const handleDropdownToggle = () => setDropdownOpen(!dropdownOpen);
@@ -65,6 +76,24 @@ export default function DashboardMatches() {
   };
   
 
+  if (!tournamentDetails) {
+    return (
+      <>
+        <Navbar />
+        <section className="min-h-[100vh] flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <h1 className="text-2xl font-bold text-foreground">No tournament selected</h1>
+          <p className="text-foreground/70">Open a tournament from the list first.</p>
+          <button
+            onClick={() => navigate("/showTournaments")}
+            className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
+          >
+            Go to tournaments
+          </button>
+        </section>
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
@@ -80,11 +109,15 @@ export default function DashboardMatches() {
 
       <section className="min-h-[100vh] relative py-20 bg-background/80">
         {/* COVER SECTION */}
-        <section className="h-[30vh] relative">
-          <img
-            src={tournamentDetails.coverImage}
-            className="w-full h-full object-cover"
-          />
+        <section className="h-[30vh] relative bg-gradient-to-r from-green-700 to-green-500">
+          {tournamentDetails.coverImage && (
+            <img
+              src={tournamentDetails.coverImage}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
+          )}
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
             <h1 className="text-4xl md:text-5xl font-bold text-white">
               {tournamentDetails.name}

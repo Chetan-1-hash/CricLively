@@ -79,7 +79,7 @@ export class Team {
   id?: string;
   tournamentId!: string;
   teamName!: string;
-  logoImage!: File;
+  logoImage?: File; // optional
   captainId!: string;
   squadPlayerIds! : string[];
 

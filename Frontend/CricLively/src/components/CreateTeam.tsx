@@ -212,23 +212,24 @@ export default function CreateTeam() {
   };
 
   const submitTeam = async () => {
-    if (!nameAvailable || !selectedTournament || !selectedCaptainId || !logo) {
-
+    if (!nameAvailable || !selectedTournament || !selectedCaptainId) {
+      const missing = [
+        !selectedTournament && "tournament",
+        !nameAvailable && "a free team name",
+        !selectedCaptainId && "captain",
+      ].filter(Boolean);
       toast({
         title: "Failed to create team",
-        description: "Please fill all required fields",
+        description: `Please choose: ${missing.join(", ")}`,
         variant: "destructive",
       });
-      setTimeout(() => {
-        navigate("/matchesDashboard");
-      }, 2000);
       return;
     }
 
     const payload: Team = {
       tournamentId: selectedTournament.id,
       teamName: teamName,
-      logoImage: logo,
+      logoImage: logo ?? undefined, // the logo is optional
       captainId: selectedCaptainId,
       squadPlayerIds: selectedPlayerIds,
     };
@@ -236,6 +237,7 @@ export default function CreateTeam() {
     try {
       await addTeamAPI(payload);
       toast({ title: "Team created successfully 🎉" });
+      setTimeout(() => navigate("/matchesDashboard"), 1200);
     } catch (err: any) {
       console.log(err);
       toast({
@@ -272,7 +274,7 @@ export default function CreateTeam() {
             )}
 
             <label className="mt-3 cursor-pointer text-primary text-sm">
-              Upload Team Logo
+              Upload Team Logo (optional)
               <input
                 hidden
                 type="file"

@@ -67,6 +67,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/matches/**").hasAnyRole("ORGANIZER", "ADMIN")
 
                         // ---------- 4. EVERY signed-in person: view + own profile ----------
+                        .requestMatchers("/ws/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN") // live score connection
                         .requestMatchers("/profile/me").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/player/*/playerInfo")
                                 .hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")

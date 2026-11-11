@@ -10,6 +10,7 @@ import com.CricLively.Repository.ProfileRepository;
 import com.CricLively.Repository.TeamRepository;
 import com.CricLively.Repository.TournamentRepository;
 import lombok.RequiredArgsConstructor;
+import com.CricLively.Websocket.LiveScoreHandler;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,7 @@ public class MatchService {
     private final TeamRepository teamRepository;
     private final MatchAccessService accessService;
     private final ProfileRepository profileRepository;
+    private final LiveScoreHandler liveScores;
 
     /** Every match - tournament matches AND single (tournament-less) matches. */
     public List<MatchDashboardDTO> getAllMatches(Authentication auth) {
@@ -69,6 +71,7 @@ public class MatchService {
                                                    MatchAccessService.Actor actor) {
         String teamAName = teamA != null ? teamA.getTeamName() : "Unknown team";
         String teamBName = teamB != null ? teamB.getTeamName() : "Unknown team";
+        System.out.println(match.getDate() + " " + match.getTime());
         MatchDashboardDTO.MatchDashboardDTOBuilder builder = MatchDashboardDTO.builder()
                 .matchId(match.getId())
                 .tournamentId(tournament != null ? tournament.getId() : null) // null = single match
@@ -163,6 +166,7 @@ public class MatchService {
         match.setInnings2(null);
 
         matchRepository.save(match);
+        liveScores.publishAll(); // match lists show the new match without a refresh
     }
 
     private static boolean isBlank(String s) {

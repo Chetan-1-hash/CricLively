@@ -9,6 +9,7 @@ import { TeamsListAPI } from "../API/TeamsAPI";
 import type { TeamsList } from "./data/DTO";
 import { addMatch } from "../API/MatchApi";
 import type { AddMatchDTO, MatchType } from "./data/MatchEntity";
+import { getSelectedTournament } from "../lib/selectedTournament";
 
 const MATCH_TYPES: MatchType[] = [
   "LEAGUE", "GROUP", "ROUND_ROBIN",
@@ -121,7 +122,14 @@ export default function CreateMatch() {
       });
 
       toast({ title: "Match created successfully", description: "The match has been added." });
-      setTimeout(() => navigate("/matchesDashboard"), 1500);
+      // a tournament match goes back to that tournament, a single match to the Matches page
+      const saved = getSelectedTournament();
+      const next = !matchDTO.tournamentId
+        ? "/matches"
+        : saved?.id === matchDTO.tournamentId
+        ? "/matchesDashboard"
+        : "/showTournaments";
+      setTimeout(() => navigate(next), 1500);
     } catch (e) {
       toast({
         title: "Failed to create match",

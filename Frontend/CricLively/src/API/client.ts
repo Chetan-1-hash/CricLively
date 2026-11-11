@@ -1,5 +1,8 @@
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
+// live score connection: http://host -> ws://host, https://host -> wss://host
+export const WS_URL = API_URL.replace(/^http/, "ws") + "/ws/live";
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {

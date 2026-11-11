@@ -1,0 +1,644 @@
+diff --git a/Backend/CricLively/pom.xml b/Backend/CricLively/pom.xml
+index 7729585..90fe17d 100644
+--- a/Backend/CricLively/pom.xml
++++ b/Backend/CricLively/pom.xml
+@@ -38,6 +38,10 @@
+ 			<groupId>org.springframework.boot</groupId>
+ 			<artifactId>spring-boot-starter-web</artifactId>
+ 		</dependency>
++		<dependency>
++			<groupId>org.springframework.boot</groupId>
++			<artifactId>spring-boot-starter-websocket</artifactId>
++		</dependency>
+ 		<dependency>
+ 			<groupId>org.springframework.boot</groupId>
+ 			<artifactId>spring-boot-starter-security</artifactId>
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/RestController/ScoringController.java b/Backend/CricLively/src/main/java/com/CricLively/RestController/ScoringController.java
+index 07a7220..6680e94 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/RestController/ScoringController.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/RestController/ScoringController.java
+@@ -7,6 +7,7 @@ import com.CricLively.Entities.Innings;
+ import com.CricLively.Entities.Toss;
+ import com.CricLively.Service.MatchAccessService;
+ import com.CricLively.Service.ScoringService;
++import com.CricLively.Websocket.LiveScoreHandler;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+@@ -32,6 +33,7 @@ public class ScoringController {
+ 
+     private final ScoringService scoringService;
+     private final MatchAccessService accessService;
++    private final LiveScoreHandler liveScores;
+ 
+     // =====================================================================
+     // SCOREBOARD - read only, every logged-in person
+@@ -64,7 +66,11 @@ public class ScoringController {
+     public ResponseEntity<?> setScorers(@PathVariable String matchId,
+                                         @RequestBody ScorersRequest request,
+                                         Authentication auth) {
+-        return run(() -> accessService.setScorers(matchId, request.getProfileIds(), auth));
++        return run(() -> {
++            Object result = accessService.setScorers(matchId, request.getProfileIds(), auth);
++            liveScores.publish(matchId); // lists show/hide the Start Scoring button
++            return result;
++        });
+     }
+ 
+     // =====================================================================
+@@ -126,7 +132,9 @@ public class ScoringController {
+     private ResponseEntity<?> scorer(String matchId, Authentication auth, Supplier<Object> action) {
+         return run(() -> {
+             accessService.requireScorer(matchId, auth);
+-            return action.get();
++            Object result = action.get();
++            liveScores.publish(matchId); // everybody watching this match refreshes
++            return result;
+         });
+     }
+ 
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java b/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java
+index e834f1d..050a2c8 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Security/SecurityConfig.java
+@@ -67,6 +67,7 @@ public class SecurityConfig {
+                         .requestMatchers(HttpMethod.DELETE, "/matches/**").hasAnyRole("ORGANIZER", "ADMIN")
+ 
+                         // ---------- 4. EVERY signed-in person: view + own profile ----------
++                        .requestMatchers("/ws/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN") // live score connection
+                         .requestMatchers("/profile/me").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                         .requestMatchers(HttpMethod.PUT, "/player/*/playerInfo")
+                                 .hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java
+index 75ab3b6..31b9278 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchService.java
+@@ -10,6 +10,7 @@ import com.CricLively.Repository.ProfileRepository;
+ import com.CricLively.Repository.TeamRepository;
+ import com.CricLively.Repository.TournamentRepository;
+ import lombok.RequiredArgsConstructor;
++import com.CricLively.Websocket.LiveScoreHandler;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.stereotype.Service;
+ 
+@@ -27,6 +28,7 @@ public class MatchService {
+     private final TeamRepository teamRepository;
+     private final MatchAccessService accessService;
+     private final ProfileRepository profileRepository;
++    private final LiveScoreHandler liveScores;
+ 
+     /** Every match - tournament matches AND single (tournament-less) matches. */
+     public List<MatchDashboardDTO> getAllMatches(Authentication auth) {
+@@ -163,6 +165,7 @@ public class MatchService {
+         match.setInnings2(null);
+ 
+         matchRepository.save(match);
++        liveScores.publishAll(); // match lists show the new match without a refresh
+     }
+ 
+     private static boolean isBlank(String s) {
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Websocket/LiveScoreHandler.java b/Backend/CricLively/src/main/java/com/CricLively/Websocket/LiveScoreHandler.java
+new file mode 100644
+index 0000000..38ee409
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/Websocket/LiveScoreHandler.java
+@@ -0,0 +1,88 @@
++package com.CricLively.Websocket;
++
++import org.springframework.stereotype.Component;
++import org.springframework.web.socket.CloseStatus;
++import org.springframework.web.socket.TextMessage;
++import org.springframework.web.socket.WebSocketSession;
++import org.springframework.web.socket.handler.TextWebSocketHandler;
++
++import java.io.IOException;
++import java.util.Set;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.Map;
++import java.util.regex.Pattern;
++
++/**
++ * Pushes "something changed" to everybody who is watching a match, so pages do not need a refresh.
++ *
++ * It sends only a tiny hint ("update:<matchId>"). The page then asks the normal REST API for the
++ * fresh data, so the server stays the single source of truth and nothing can go out of sync.
++ *
++ * Messages from the browser (plain text):
++ *   subscribe:<matchId>    watch one match
++ *   subscribe:*            watch every match (used by the match lists)
++ *   unsubscribe:<matchId>
++ * Who may connect is decided in SecurityConfig (/ws/** = any logged-in person).
++ */
++@Component
++public class LiveScoreHandler extends TextWebSocketHandler {
++
++    private static final Pattern ID = Pattern.compile("^[A-Za-z0-9*_-]{1,64}$");
++    private static final int MAX_SUBSCRIPTIONS_PER_SESSION = 10;
++
++    private final Map<String, Set<WebSocketSession>> subscribers = new ConcurrentHashMap<>();
++
++    @Override
++    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
++        String text = message.getPayload().trim();
++        if (text.startsWith("subscribe:")) {
++            String id = text.substring("subscribe:".length());
++            if (ID.matcher(id).matches() && subscriptionCount(session) < MAX_SUBSCRIPTIONS_PER_SESSION) {
++                subscribers.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet()).add(session);
++            }
++        } else if (text.startsWith("unsubscribe:")) {
++            Set<WebSocketSession> set = subscribers.get(text.substring("unsubscribe:".length()));
++            if (set != null) set.remove(session);
++        }
++    }
++
++    @Override
++    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
++        subscribers.values().forEach(set -> set.remove(session));
++    }
++
++    /** One match changed: tell its watchers and everyone watching all matches. */
++    public void publish(String matchId) {
++        send(subscribers.get(matchId), "update:" + matchId);
++        send(subscribers.get("*"), "update:" + matchId);
++    }
++
++    /** Something changed that is not about one match (e.g. a new match): tell the list watchers. */
++    public void publishAll() {
++        send(subscribers.get("*"), "update:*");
++    }
++
++    private int subscriptionCount(WebSocketSession session) {
++        int n = 0;
++        for (Set<WebSocketSession> set : subscribers.values()) if (set.contains(session)) n++;
++        return n;
++    }
++
++    private void send(Set<WebSocketSession> sessions, String text) {
++        if (sessions == null) return;
++        TextMessage message = new TextMessage(text);
++        for (WebSocketSession s : sessions) {
++            try {
++                if (s.isOpen()) {
++                    synchronized (s) { // a session must not be written by two threads at once
++                        s.sendMessage(message);
++                    }
++                } else {
++                    sessions.remove(s);
++                }
++            } catch (IOException e) {
++                sessions.remove(s);
++            }
++        }
++    }
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Websocket/WebSocketConfig.java b/Backend/CricLively/src/main/java/com/CricLively/Websocket/WebSocketConfig.java
+new file mode 100644
+index 0000000..f5b53c4
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/Websocket/WebSocketConfig.java
+@@ -0,0 +1,26 @@
++package com.CricLively.Websocket;
++
++import lombok.RequiredArgsConstructor;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.web.socket.config.annotation.EnableWebSocket;
++import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
++import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
++
++@Configuration
++@EnableWebSocket
++@RequiredArgsConstructor
++public class WebSocketConfig implements WebSocketConfigurer {
++
++    private final LiveScoreHandler liveScoreHandler;
++
++    /** Same setting as CORS: the address of the React app. */
++    @Value("${app.cors.allowed-origin:http://localhost:5173}")
++    private String allowedOrigin;
++
++    @Override
++    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
++        String[] origins = allowedOrigin.trim().split("\\s*,\\s*");
++        registry.addHandler(liveScoreHandler, "/ws/live").setAllowedOrigins(origins);
++    }
++}
+diff --git a/Frontend/CricLively/src/API/TournamentAPI.ts b/Frontend/CricLively/src/API/TournamentAPI.ts
+index 9f92427..314dae2 100644
+--- a/Frontend/CricLively/src/API/TournamentAPI.ts
++++ b/Frontend/CricLively/src/API/TournamentAPI.ts
+@@ -62,7 +62,7 @@ export default async function TournamentListAPI(): Promise<TournamentResponse[]>
+   // Map each tournament to include the full image URL
+   const tournamentsWithImageUrl = tournaments.map(t => ({
+     ...t,
+-    coverImage: `${API_URL}/images/${t.coverImage}`
++    coverImage: t.coverImage ? `${API_URL}/images/${t.coverImage}` : "" // a tournament may have no cover
+   }));
+ 
+   return tournamentsWithImageUrl;
+diff --git a/Frontend/CricLively/src/API/client.ts b/Frontend/CricLively/src/API/client.ts
+index b2ac6d8..6c6620a 100644
+--- a/Frontend/CricLively/src/API/client.ts
++++ b/Frontend/CricLively/src/API/client.ts
+@@ -1,5 +1,8 @@
+ export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+ 
++// live score connection: http://host -> ws://host, https://host -> wss://host
++export const WS_URL = API_URL.replace(/^http/, "ws") + "/ws/live";
++
+ export class ApiError extends Error {
+   status: number;
+   constructor(status: number, message: string) {
+diff --git a/Frontend/CricLively/src/components/CreateMatch.tsx b/Frontend/CricLively/src/components/CreateMatch.tsx
+index ed8f713..8fb0cca 100644
+--- a/Frontend/CricLively/src/components/CreateMatch.tsx
++++ b/Frontend/CricLively/src/components/CreateMatch.tsx
+@@ -9,6 +9,7 @@ import { TeamsListAPI } from "../API/TeamsAPI";
+ import type { TeamsList } from "./data/DTO";
+ import { addMatch } from "../API/MatchApi";
+ import type { AddMatchDTO, MatchType } from "./data/MatchEntity";
++import { getSelectedTournament } from "../lib/selectedTournament";
+ 
+ const MATCH_TYPES: MatchType[] = [
+   "LEAGUE", "GROUP", "ROUND_ROBIN",
+@@ -121,7 +122,14 @@ export default function CreateMatch() {
+       });
+ 
+       toast({ title: "Match created successfully", description: "The match has been added." });
+-      setTimeout(() => navigate("/matchesDashboard"), 1500);
++      // a tournament match goes back to that tournament, a single match to the Matches page
++      const saved = getSelectedTournament();
++      const next = !matchDTO.tournamentId
++        ? "/matches"
++        : saved?.id === matchDTO.tournamentId
++        ? "/matchesDashboard"
++        : "/showTournaments";
++      setTimeout(() => navigate(next), 1500);
+     } catch (e) {
+       toast({
+         title: "Failed to create match",
+diff --git a/Frontend/CricLively/src/components/CreateTeam.tsx b/Frontend/CricLively/src/components/CreateTeam.tsx
+index 4807ca0..cd831e7 100644
+--- a/Frontend/CricLively/src/components/CreateTeam.tsx
++++ b/Frontend/CricLively/src/components/CreateTeam.tsx
+@@ -212,23 +212,24 @@ export default function CreateTeam() {
+   };
+ 
+   const submitTeam = async () => {
+-    if (!nameAvailable || !selectedTournament || !selectedCaptainId || !logo) {
+-
++    if (!nameAvailable || !selectedTournament || !selectedCaptainId) {
++      const missing = [
++        !selectedTournament && "tournament",
++        !nameAvailable && "a free team name",
++        !selectedCaptainId && "captain",
++      ].filter(Boolean);
+       toast({
+         title: "Failed to create team",
+-        description: "Please fill all required fields",
++        description: `Please choose: ${missing.join(", ")}`,
+         variant: "destructive",
+       });
+-      setTimeout(() => {
+-        navigate("/matchesDashboard");
+-      }, 2000);
+       return;
+     }
+ 
+     const payload: Team = {
+       tournamentId: selectedTournament.id,
+       teamName: teamName,
+-      logoImage: logo,
++      logoImage: logo ?? undefined, // the logo is optional
+       captainId: selectedCaptainId,
+       squadPlayerIds: selectedPlayerIds,
+     };
+@@ -236,6 +237,7 @@ export default function CreateTeam() {
+     try {
+       await addTeamAPI(payload);
+       toast({ title: "Team created successfully 🎉" });
++      setTimeout(() => navigate("/matchesDashboard"), 1200);
+     } catch (err: any) {
+       console.log(err);
+       toast({
+@@ -272,7 +274,7 @@ export default function CreateTeam() {
+             )}
+ 
+             <label className="mt-3 cursor-pointer text-primary text-sm">
+-              Upload Team Logo
++              Upload Team Logo (optional)
+               <input
+                 hidden
+                 type="file"
+diff --git a/Frontend/CricLively/src/components/DashboardMatches.tsx b/Frontend/CricLively/src/components/DashboardMatches.tsx
+index de26356..80952f2 100644
+--- a/Frontend/CricLively/src/components/DashboardMatches.tsx
++++ b/Frontend/CricLively/src/components/DashboardMatches.tsx
+@@ -1,7 +1,9 @@
+ import { canOrganize } from "../lib/auth";
+ import { openScoreboard, openScorer } from "../lib/matchAccess";
+ import ScorerAccessDialog from "./ScorerAccessDialog";
+-import { useEffect, useState } from "react";
++import { useLiveUpdates } from "../lib/useLiveUpdates";
++import { getSelectedTournament, saveSelectedTournament } from "../lib/selectedTournament";
++import { useEffect, useMemo, useState } from "react";
+ import { motion, AnimatePresence } from "framer-motion";
+ import Navbar from "../components/Navbar";
+ import MatchCard from "../components/MatchCard";
+@@ -12,7 +14,11 @@ import { getTournamentMatches } from "../API/MatchApi";
+ 
+ export default function DashboardMatches() {
+   const location = useLocation();
+-  const tournamentDetails = location.state?.tournament;
++  // The router state is lost after a refresh or after creating a team / match, so fall back to the saved one
++  const tournamentDetails = useMemo(
++    () => location.state?.tournament ?? getSelectedTournament(),
++    [location.state]
++  );
+ 
+   const navigate = useNavigate();
+   const organizer = canOrganize(); // only organizers/admins see the create menu
+@@ -29,10 +35,15 @@ export default function DashboardMatches() {
+ 
+   useEffect(() => {
+     if (!tournamentDetails) return;
++    saveSelectedTournament(tournamentDetails);
+     loadAllMatches();
+   }, [tournamentDetails]);
+ 
++  // scores and statuses update by themselves
++  useLiveUpdates("*", () => loadAllMatches());
++
+   const loadAllMatches = async () => {
++    if (!tournamentDetails) return;
+     try {
+       const data = await getTournamentMatches(tournamentDetails.id);
+       setMatches(data);
+@@ -42,7 +53,7 @@ export default function DashboardMatches() {
+   };
+ 
+   const filteredMatches = matches.filter(
+-    (m) => m.tournamentId === tournamentDetails.id && m.matchStatus === matchFilter
++    (m) => m.tournamentId === tournamentDetails?.id && m.matchStatus === matchFilter
+ );
+ 
+   const handleDropdownToggle = () => setDropdownOpen(!dropdownOpen);
+@@ -65,6 +76,24 @@ export default function DashboardMatches() {
+   };
+   
+ 
++  if (!tournamentDetails) {
++    return (
++      <>
++        <Navbar />
++        <section className="min-h-[100vh] flex flex-col items-center justify-center gap-4 px-6 text-center">
++          <h1 className="text-2xl font-bold text-foreground">No tournament selected</h1>
++          <p className="text-foreground/70">Open a tournament from the list first.</p>
++          <button
++            onClick={() => navigate("/showTournaments")}
++            className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
++          >
++            Go to tournaments
++          </button>
++        </section>
++      </>
++    );
++  }
++
+   return (
+     <>
+       <Navbar />
+@@ -80,11 +109,15 @@ export default function DashboardMatches() {
+ 
+       <section className="min-h-[100vh] relative py-20 bg-background/80">
+         {/* COVER SECTION */}
+-        <section className="h-[30vh] relative">
+-          <img
+-            src={tournamentDetails.coverImage}
+-            className="w-full h-full object-cover"
+-          />
++        <section className="h-[30vh] relative bg-gradient-to-r from-green-700 to-green-500">
++          {tournamentDetails.coverImage && (
++            <img
++              src={tournamentDetails.coverImage}
++              alt=""
++              className="w-full h-full object-cover"
++              onError={(e) => (e.currentTarget.style.display = "none")}
++            />
++          )}
+           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+             <h1 className="text-4xl md:text-5xl font-bold text-white">
+               {tournamentDetails.name}
+diff --git a/Frontend/CricLively/src/components/DashboardTournament.tsx b/Frontend/CricLively/src/components/DashboardTournament.tsx
+index 11bd41d..8fa5c80 100644
+--- a/Frontend/CricLively/src/components/DashboardTournament.tsx
++++ b/Frontend/CricLively/src/components/DashboardTournament.tsx
+@@ -104,12 +104,17 @@ export default function DashboardTournament() {
+                 className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl hover:scale-105 transition-transform cursor-pointer"
+               >
+                 {/* Tournament image */}
+-                <div className="w-full h-32 rounded-2xl overflow-hidden mb-4">
+-                  <img
+-                    src={tournament.coverImage}
+-                    alt={tournament.name}
+-                    className="w-full h-full object-contain"
+-                  />
++                <div className="w-full h-32 rounded-2xl overflow-hidden mb-4 bg-foreground/10 flex items-center justify-center text-5xl">
++                  {tournament.coverImage ? (
++                    <img
++                      src={tournament.coverImage}
++                      alt={tournament.name}
++                      className="w-full h-full object-contain"
++                      onError={(e) => (e.currentTarget.style.display = "none")}
++                    />
++                  ) : (
++                    "🏆"
++                  )}
+                 </div>
+ 
+                 {/* Tournament info */}
+diff --git a/Frontend/CricLively/src/components/Matches.tsx b/Frontend/CricLively/src/components/Matches.tsx
+index 57267e0..aa7542f 100644
+--- a/Frontend/CricLively/src/components/Matches.tsx
++++ b/Frontend/CricLively/src/components/Matches.tsx
+@@ -1,6 +1,7 @@
+ import { canOrganize } from "../lib/auth";
+ import { openScoreboard, openScorer } from "../lib/matchAccess";
+ import ScorerAccessDialog from "./ScorerAccessDialog";
++import { useLiveUpdates } from "../lib/useLiveUpdates";
+ import { motion } from "framer-motion";
+ import Navbar from "./Navbar";
+ import { useEffect, useState } from "react";
+@@ -24,6 +25,9 @@ export default function Matches() {
+     loadAllMatches();
+   },[]);
+ 
++  // scores and statuses update by themselves
++  useLiveUpdates("*", () => loadAllMatches());
++
+   const loadAllMatches = async () => {
+     try {
+       const data = await getAllMatches();
+diff --git a/Frontend/CricLively/src/components/Scorer.tsx b/Frontend/CricLively/src/components/Scorer.tsx
+index 20e38c5..23068fd 100644
+--- a/Frontend/CricLively/src/components/Scorer.tsx
++++ b/Frontend/CricLively/src/components/Scorer.tsx
+@@ -17,6 +17,7 @@ import { scoringReducer } from "./data/scoringReducer";
+ import Navbar from "./Navbar";
+ import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
+ import LineupPanel from "./LineupPanel";
++import { useLiveUpdates } from "../lib/useLiveUpdates";
+ import ScorerAccessDialog from "./ScorerAccessDialog";
+ 
+ const WICKET_TYPES: WicketType[] = ["Bowled", "Caught", "LBW", "Run Out", "Stumped", "Hit Wicket", "Retired Hurt"];
+@@ -111,6 +112,9 @@ export default function Scorer() {
+     load();
+   }, [load]);
+ 
++  // another scorer / the main organizer changed something: show it without a refresh
++  useLiveUpdates(matchId ?? "", load);
++
+   // Rebuild the score by replaying the saved balls
+   const base = useMemo(() => (sb ? buildScoreState(sb) : null), [sb]);
+   const state = useMemo(() => {
+diff --git a/Frontend/CricLively/src/components/data/DTO.tsx b/Frontend/CricLively/src/components/data/DTO.tsx
+index b6f87bc..4dcc198 100644
+--- a/Frontend/CricLively/src/components/data/DTO.tsx
++++ b/Frontend/CricLively/src/components/data/DTO.tsx
+@@ -79,7 +79,7 @@ export class Team {
+   id?: string;
+   tournamentId!: string;
+   teamName!: string;
+-  logoImage!: File;
++  logoImage?: File; // optional
+   captainId!: string;
+   squadPlayerIds! : string[];
+ 
+diff --git a/Frontend/CricLively/src/components/viewer.tsx b/Frontend/CricLively/src/components/viewer.tsx
+index 8851eb4..a19d250 100644
+--- a/Frontend/CricLively/src/components/viewer.tsx
++++ b/Frontend/CricLively/src/components/viewer.tsx
+@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
+ import { toast } from "../hooks/use-toast";
+ import { getScoreboard } from "../API/ScoringAPI";
+ import { buildScoreState } from "../lib/scoreAdapter";
++import { useLiveUpdates } from "../lib/useLiveUpdates";
+ import type { MatchScoreState } from "./data/MatchScoringTypes";
+ import Navbar from "./Navbar";
+ 
+@@ -18,12 +19,15 @@ export default function ViewerPage() {
+ 
+   useEffect(() => {
+     loadScore();
+-    // keep the score fresh while someone is watching
+-    const timer = setInterval(() => loadScore(true), 10000);
++    // safety net only: the WebSocket below pushes every change as it happens
++    const timer = setInterval(() => loadScore(true), 30000);
+     return () => clearInterval(timer);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [matchId]);
+ 
++  // live score: the server says "this match changed", we fetch the fresh data
++  useLiveUpdates(matchId ?? "", () => loadScore(true));
++
+   const loadScore = async (silent = false) => {
+     if (!matchId) return;
+     try {
+diff --git a/Frontend/CricLively/src/lib/selectedTournament.ts b/Frontend/CricLively/src/lib/selectedTournament.ts
+new file mode 100644
+index 0000000..6eb02db
+--- /dev/null
++++ b/Frontend/CricLively/src/lib/selectedTournament.ts
+@@ -0,0 +1,23 @@
++// Remembers which tournament is open, so "/matchesDashboard" still works after
++// creating a team or a match, or after a page refresh (the router state is lost then).
++
++const KEY = "criclively.selectedTournament";
++
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++export function saveSelectedTournament(tournament: any) {
++  try {
++    sessionStorage.setItem(KEY, JSON.stringify(tournament));
++  } catch {
++    /* storage can be blocked: the page just works without it */
++  }
++}
++
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++export function getSelectedTournament(): any | null {
++  try {
++    const raw = sessionStorage.getItem(KEY);
++    return raw ? JSON.parse(raw) : null;
++  } catch {
++    return null;
++  }
++}
+diff --git a/Frontend/CricLively/src/lib/useLiveUpdates.ts b/Frontend/CricLively/src/lib/useLiveUpdates.ts
+new file mode 100644
+index 0000000..c9a97ce
+--- /dev/null
++++ b/Frontend/CricLively/src/lib/useLiveUpdates.ts
+@@ -0,0 +1,63 @@
++import { useEffect, useRef } from "react";
++import { WS_URL } from "../API/client";
++
++/**
++ * Live updates over a WebSocket.
++ *   useLiveUpdates(matchId, reload)  -> reload() runs whenever that match changes
++ *   useLiveUpdates("*", reload)      -> reload() runs whenever ANY match changes
++ * The server only says "something changed"; reload() fetches the fresh data from the normal API.
++ * If the connection drops it reconnects by itself and reloads once, so nothing is missed.
++ */
++export function useLiveUpdates(target: string, onUpdate: () => void) {
++  const latest = useRef(onUpdate);
++  useEffect(() => {
++    latest.current = onUpdate;
++  });
++
++  useEffect(() => {
++    if (!target) return;
++
++    let socket: WebSocket | null = null;
++    let retryTimer: ReturnType<typeof setTimeout> | undefined;
++    let burstTimer: ReturnType<typeof setTimeout> | undefined;
++    let closedByUs = false;
++    let attempt = 0;
++    let connectedBefore = false;
++
++    const connect = () => {
++      socket = new WebSocket(WS_URL);
++
++      socket.onopen = () => {
++        socket?.send(`subscribe:${target}`);
++        // we may have missed something while the line was down
++        if (connectedBefore) latest.current();
++        connectedBefore = true;
++        attempt = 0;
++      };
++
++      socket.onmessage = (event) => {
++        if (typeof event.data !== "string" || !event.data.startsWith("update:")) return;
++        // several changes in a row (a ball + the totals) -> one reload
++        clearTimeout(burstTimer);
++        burstTimer = setTimeout(() => latest.current(), 150);
++      };
++
++      socket.onclose = () => {
++        if (closedByUs) return;
++        retryTimer = setTimeout(connect, Math.min(1000 * 2 ** attempt, 15000));
++        attempt += 1;
++      };
++
++      socket.onerror = () => socket?.close();
++    };
++
++    connect();
++
++    return () => {
++      closedByUs = true;
++      clearTimeout(retryTimer);
++      clearTimeout(burstTimer);
++      socket?.close();
++    };
++  }, [target]);
++}

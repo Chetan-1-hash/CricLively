@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "../hooks/use-toast";
 import { getScoreboard } from "../API/ScoringAPI";
 import { buildScoreState } from "../lib/scoreAdapter";
+import { useLiveUpdates } from "../lib/useLiveUpdates";
 import type { MatchScoreState } from "./data/MatchScoringTypes";
 import Navbar from "./Navbar";
 
@@ -18,11 +19,14 @@ export default function ViewerPage() {
 
   useEffect(() => {
     loadScore();
-    // keep the score fresh while someone is watching
-    const timer = setInterval(() => loadScore(true), 10000);
+    // safety net only: the WebSocket below pushes every change as it happens
+    const timer = setInterval(() => loadScore(true), 30000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId]);
+
+  // live score: the server says "this match changed", we fetch the fresh data
+  useLiveUpdates(matchId ?? "", () => loadScore(true));
 
   const loadScore = async (silent = false) => {
     if (!matchId) return;

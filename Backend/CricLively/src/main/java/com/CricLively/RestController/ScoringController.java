@@ -7,6 +7,7 @@ import com.CricLively.Entities.Innings;
 import com.CricLively.Entities.Toss;
 import com.CricLively.Service.MatchAccessService;
 import com.CricLively.Service.ScoringService;
+import com.CricLively.Websocket.LiveScoreHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,7 @@ public class ScoringController {
 
     private final ScoringService scoringService;
     private final MatchAccessService accessService;
+    private final LiveScoreHandler liveScores;
 
     // =====================================================================
     // SCOREBOARD - read only, every logged-in person
@@ -64,7 +66,11 @@ public class ScoringController {
     public ResponseEntity<?> setScorers(@PathVariable String matchId,
                                         @RequestBody ScorersRequest request,
                                         Authentication auth) {
-        return run(() -> accessService.setScorers(matchId, request.getProfileIds(), auth));
+        return run(() -> {
+            Object result = accessService.setScorers(matchId, request.getProfileIds(), auth);
+            liveScores.publish(matchId); // lists show/hide the Start Scoring button
+            return result;
+        });
     }
 
     // =====================================================================
@@ -126,7 +132,9 @@ public class ScoringController {
     private ResponseEntity<?> scorer(String matchId, Authentication auth, Supplier<Object> action) {
         return run(() -> {
             accessService.requireScorer(matchId, auth);
-            return action.get();
+            Object result = action.get();
+            liveScores.publish(matchId); // everybody watching this match refreshes
+            return result;
         });
     }
 
