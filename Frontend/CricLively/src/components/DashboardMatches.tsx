@@ -78,6 +78,12 @@ export default function DashboardMatches() {
       const data = await getTournamentMatches(tournamentDetails.id);
       setMatches(data);
     } catch (err) {
+      if ((err as { status?: number }).status === 403) {
+        // not following this tournament: back to the list with the reason
+        toast({ title: "You can't open this tournament", description: (err as Error).message, variant: "destructive" });
+        navigate("/showTournaments");
+        return;
+      }
       console.error(err);
     }
   };

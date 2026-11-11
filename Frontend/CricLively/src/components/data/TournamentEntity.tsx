@@ -36,6 +36,9 @@ export class TournamentResponse {
   tournamentStatus!: TournamentStatus;
   teamIds: string[] = [];
   originalEndDate?: string;
+  canAccess?: boolean; // admin, organizer of it, or follower
+  following?: boolean;
+  followerCount?: number;
   finished?: boolean; // today is after endDate
   canExtend?: boolean; // may I extend it?
   extensions?: TournamentExtensionInfo[];

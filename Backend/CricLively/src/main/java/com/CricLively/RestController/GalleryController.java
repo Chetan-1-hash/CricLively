@@ -23,11 +23,22 @@ public class GalleryController {
 
     @PostMapping("/addImages")
     public ResponseEntity<?> addGallery(@RequestParam MultipartFile file, @RequestParam Integer year){
-        if(!file.isEmpty()){
-            Gallery g = this.galleryService.addImages(file,year);
-            return ResponseEntity.ok().body(g);
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "Choose a photo to upload"));
         }
-        return ResponseEntity.badRequest().build();
+        String type = file.getContentType();
+        if (type == null || !type.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "Only image files can be uploaded"));
+        }
+        if (file.getSize() > 5L * 1024 * 1024) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "The photo is too big (5 MB at most)"));
+        }
+        int thisYear = java.time.Year.now().getValue();
+        if (year == null || year < 2000 || year > thisYear + 1) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "Choose a valid year"));
+        }
+        Gallery g = this.galleryService.addImages(file, year);
+        return ResponseEntity.ok().body(g);
     }
 
     @PostMapping("/addImagesWithId/")

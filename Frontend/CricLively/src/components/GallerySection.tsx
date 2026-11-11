@@ -1,15 +1,51 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
-import { getgalleryApi } from "../API/GalleryApi";
+import { getgalleryApi, addgalleryApi } from "../API/GalleryApi";
+import { canOrganize } from "../lib/auth";
 import { Gallery } from "./data/DTO";
 import { toast } from "../hooks/use-toast";
 
 export default function GallerySection() {
   const [images, setImages] = useState<Gallery[]>([]);
-  const years = ["All", 2022, 2023, 2024, 2025] as const;
+  const organizer = canOrganize(); // only organizers / admins can upload
+  const thisYear = new Date().getFullYear();
+  // the year buttons come from the photos themselves (plus this year)
+  const years: ("All" | number)[] = [
+    "All",
+    ...Array.from(new Set([thisYear, ...images.map((i) => i.year)])).sort((a, b) => a - b),
+  ];
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [activeYear, setActiveYear] = useState<typeof years[number]>("All");
+  const [activeYear, setActiveYear] = useState<"All" | number>("All");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadYear, setUploadYear] = useState<number>(thisYear);
+  const [uploading, setUploading] = useState(false);
+
+  const upload = async () => {
+    if (!file) {
+      toast({ title: "Choose a photo first", variant: "destructive" });
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Only image files can be uploaded", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "The photo is too big", description: "5 MB at most.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      await addgalleryApi(file, uploadYear);
+      toast({ title: "Photo uploaded" });
+      setFile(null);
+      await getGalleryImages();
+    } catch (e) {
+      toast({ title: "Upload failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     getGalleryImages();
@@ -59,6 +95,33 @@ export default function GallerySection() {
               CricLively Gallery
             </h1>
           </motion.div>
+
+          {organizer && (
+            <div className="mb-8 flex flex-wrap items-center gap-3 rounded-2xl bg-card/70 px-4 py-3">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="text-sm text-foreground"
+              />
+              <select
+                value={uploadYear}
+                onChange={(e) => setUploadYear(Number(e.target.value))}
+                className="px-3 py-2 rounded-xl bg-background/70 border border-border text-sm"
+              >
+                {[thisYear, thisYear - 1, thisYear - 2, thisYear - 3].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <button
+                onClick={upload}
+                disabled={uploading || !file}
+                className="px-5 py-2 rounded-full bg-red-600 text-white text-sm font-semibold disabled:opacity-60"
+              >
+                {uploading ? "Uploading…" : "Upload photo"}
+              </button>
+            </div>
+          )}
 
           {/* Year Filter Buttons */}
           <div className="flex  mb-12">

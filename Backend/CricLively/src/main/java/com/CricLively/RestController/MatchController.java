@@ -27,8 +27,12 @@ public class MatchController {
     }
 
     @GetMapping("/{tournamentId}")
-    public List<MatchDashboardDTO> getTournamentMatches(@PathVariable String tournamentId, Authentication auth){
-        return matchService.getTournamentMatches(tournamentId, auth);
+    public ResponseEntity<?> getTournamentMatches(@PathVariable String tournamentId, Authentication auth){
+        try {
+            return ResponseEntity.ok(matchService.getTournamentMatches(tournamentId, auth));
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping

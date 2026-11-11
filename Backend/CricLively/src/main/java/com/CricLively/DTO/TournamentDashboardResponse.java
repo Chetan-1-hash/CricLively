@@ -18,6 +18,9 @@ public class TournamentDashboardResponse {
 
     private LocalDate originalEndDate;   // endDate above is the extended one when it was extended
     private Boolean finished;            // true once today is after endDate
+    private Boolean canAccess;           // may the person asking open it?
+    private Boolean following;           // does the person asking follow it?
+    private Integer followerCount;
     private Boolean canExtend;           // may the person asking extend it?
     private List<ExtensionInfo> extensions;
 

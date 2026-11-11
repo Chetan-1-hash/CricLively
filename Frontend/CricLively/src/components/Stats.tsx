@@ -1,212 +1,121 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
+import { getMyStats, type PersonalStats, type StatLine } from "../API/StatsAPI";
 
-// Define types
-type BatStats = {
-  id: number;
-  player: string;
-  team: string;
-  matches: number;
-  runs: number;
-  average: number;
-};
-type BowlStats = {
-  id: number;
-  player: string;
-  team: string;
-  matches: number;
-  wickets: number;
-  economy: number;
-};
-type MVPStats = { id: number; player: string; team: string; points: number };
+function Card({ title, rows }: { title: string; rows: [string, string | number][] }) {
+  return (
+    <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl">
+      <h3 className="text-lg font-bold text-foreground mb-3">{title}</h3>
+      <div className="space-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between text-sm border-b border-border/40 last:border-0 py-1.5">
+            <span className="text-foreground/60">{label}</span>
+            <span className="font-semibold text-foreground">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-type Stats = BatStats | BowlStats | MVPStats;
+function Numbers({ s }: { s: StatLine }) {
+  return (
+    <div className="grid md:grid-cols-2 gap-6">
+      <Card
+        title="Batting"
+        rows={[
+          ["Matches", s.matches],
+          ["Innings", s.battingInnings],
+          ["Runs", s.runs],
+          ["Highest score", s.highestScore],
+          ["Average", s.average.toFixed(2)],
+          ["Strike rate", s.strikeRate.toFixed(2)],
+          ["Balls faced", s.balls],
+          ["4s / 6s", `${s.fours} / ${s.sixes}`],
+          ["50s / 100s", `${s.fifties} / ${s.hundreds}`],
+          ["Not outs", s.notOuts],
+        ]}
+      />
+      <Card
+        title="Bowling"
+        rows={[
+          ["Innings", s.bowlingInnings],
+          ["Overs", s.overs],
+          ["Runs given", s.runsConceded],
+          ["Wickets", s.wickets],
+          ["Best figures", s.bestFigures],
+          ["Economy", s.economy.toFixed(2)],
+        ]}
+      />
+    </div>
+  );
+}
 
-// Sample Data
-const battingLeaderboard: BatStats[] = [
-  {
-    id: 1,
-    player: "Virat Kohli",
-    team: "RCB",
-    matches: 14,
-    runs: 620,
-    average: 44.2,
-  },
-  {
-    id: 2,
-    player: "KL Rahul",
-    team: "LSG",
-    matches: 14,
-    runs: 540,
-    average: 42.3,
-  },
-  {
-    id: 3,
-    player: "Rohit Sharma",
-    team: "MI",
-    matches: 14,
-    runs: 500,
-    average: 40.0,
-  },
-];
-
-const bowlingLeaderboard: BowlStats[] = [
-  {
-    id: 1,
-    player: "Rashid Khan",
-    team: "SRH",
-    matches: 14,
-    wickets: 22,
-    economy: 6.5,
-  },
-  {
-    id: 2,
-    player: "Jofra Archer",
-    team: "RR",
-    matches: 12,
-    wickets: 18,
-    economy: 7.0,
-  },
-  {
-    id: 2,
-    player: "Jofra Archer",
-    team: "RR",
-    matches: 12,
-    wickets: 18,
-    economy: 7.0,
-  },
-];
-
-const mvpLeaderboard: MVPStats[] = [
-  { id: 1, player: "Virat Kohli", team: "RCB", points: 200 },
-  { id: 2, player: "Rashid Khan", team: "SRH", points: 180 },
-  { id: 3, player: "KL Rahul", team: "LSG", points: 170 },
-];
-
+// Personal statistics only: your own numbers, overall and tournament by tournament.
 export default function Stats() {
-  const [activeTab, setActiveTab] = useState<"bat" | "bowl" | "mvp">("bat");
+  const [data, setData] = useState<PersonalStats | null>(null);
+  const [error, setError] = useState("");
+  const [active, setActive] = useState<string>("ALL"); // "ALL", a tournament id, or "SINGLE"
 
-  // Determine which data to show
-  let dataToDisplay: Stats[] = [];
-  if (activeTab === "bat") dataToDisplay = battingLeaderboard;
-  if (activeTab === "bowl") dataToDisplay = bowlingLeaderboard;
-  if (activeTab === "mvp") dataToDisplay = mvpLeaderboard;
+  useEffect(() => {
+    getMyStats()
+      .then(setData)
+      .catch((e: Error) => setError(e.message || "Could not load your statistics"));
+  }, []);
+
+  const keyOf = (t: { tournamentId: string | null }) => t.tournamentId ?? "SINGLE";
+  const picked = data?.tournaments.find((t) => keyOf(t) === active);
+  const shown = active === "ALL" ? data?.overall : picked?.stats;
 
   return (
     <>
       <Navbar />
       <section className="min-h-[100vh] py-12 bg-background/80">
-        <div className="container my-12 mx-auto px-6">
-          <div className="flex flex-col items-start mb-12">
-            <motion.h1
-              className="text-4xl md:text-5xl font-extrabold text-foreground mb-8 text-center"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              Leaderboard
-            </motion.h1>
+        <div className="container my-12 mx-auto px-6 max-w-4xl">
+          <motion.h1
+            className="text-4xl md:text-5xl font-extrabold text-foreground mb-2"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            My Stats
+          </motion.h1>
+          <p className="text-foreground/70 mb-8">
+            {data?.playerName ? `${data.playerName} · ` : ""}Only your own numbers, from matches you played.
+          </p>
 
-            {/* Tabs */}
-            <div className="flex justify-center gap-4 mb-8">
-              {["bat", "bowl", "mvp"].map((tab) => (
-                <motion.button
-                  key={tab}
-                  onClick={() => setActiveTab(tab as "bat" | "bowl" | "mvp")}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`px-6 py-2 rounded-full font-semibold text-white transition-colors ${
-                    activeTab === tab ? "bg-red-600" : "bg-red-400/70"
-                  }`}
-                >
-                  {tab === "bat" ? "Bat" : tab === "bowl" ? "Bowl" : "MVP"}
-                </motion.button>
-              ))}
+          {error && <p className="text-red-600">{error}</p>}
+          {!error && !data && <p className="text-foreground/70">Loading…</p>}
+
+          {data && data.overall.matches === 0 && (
+            <div className="bg-card/80 rounded-3xl p-8 text-center shadow-2xl">
+              <p className="font-semibold text-foreground mb-1">No matches yet</p>
+              <p className="text-sm text-foreground/70">
+                Your stats appear here once you are in a team's playing XI and the match is scored.
+              </p>
             </div>
-          </div>
+          )}
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto text-left border-collapse">
-              <thead>
-                <tr className="bg-card/80 backdrop-blur-md rounded-lg">
-                  <th className="p-3 text-foreground font-semibold">#</th>
-                  <th className="p-3 text-foreground font-semibold">Player</th>
-                  <th className="p-3 text-foreground font-semibold">Team</th>
-
-                  {activeTab === "bat" && (
-                    <>
-                      <th className="p-3 text-foreground font-semibold">
-                        Matches
-                      </th>
-                      <th className="p-3 text-foreground font-semibold">
-                        Runs
-                      </th>
-                      <th className="p-3 text-foreground font-semibold">
-                        Average
-                      </th>
-                    </>
-                  )}
-
-                  {activeTab === "bowl" && (
-                    <>
-                      <th className="p-3 text-foreground font-semibold">
-                        Matches
-                      </th>
-                      <th className="p-3 text-foreground font-semibold">
-                        Wickets
-                      </th>
-                      <th className="p-3 text-foreground font-semibold">
-                        Economy
-                      </th>
-                    </>
-                  )}
-
-                  {activeTab === "mvp" && (
-                    <th className="p-3 text-foreground font-semibold">
-                      Points
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {dataToDisplay.map((player, index) => (
-                  <motion.tr
-                    key={player.id}
-                    className="bg-card/80 backdrop-blur-md rounded-lg mb-2"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                  >
-                    <td className="p-3">{index + 1}</td>
-                    <td className="p-3">{player.player}</td>
-                    <td className="p-3">{player.team}</td>
-
-                    {activeTab === "bat" && "runs" in player && (
-                      <>
-                        <td className="p-3">{player.matches}</td>
-                        <td className="p-3">{player.runs}</td>
-                        <td className="p-3">{player.average}</td>
-                      </>
-                    )}
-
-                    {activeTab === "bowl" && "wickets" in player && (
-                      <>
-                        <td className="p-3">{player.matches}</td>
-                        <td className="p-3">{player.wickets}</td>
-                        <td className="p-3">{player.economy}</td>
-                      </>
-                    )}
-
-                    {activeTab === "mvp" && "points" in player && (
-                      <td className="p-3">{player.points}</td>
-                    )}
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {data && data.overall.matches > 0 && (
+            <>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {[{ id: "ALL", label: "Overall" }, ...data.tournaments.map((t) => ({ id: keyOf(t), label: t.tournamentName }))].map(
+                  (tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActive(tab.id)}
+                      className={`px-5 py-2 rounded-full text-sm font-semibold ${
+                        active === tab.id ? "bg-red-600 text-white" : "bg-red-600/20 text-red-600"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  )
+                )}
+              </div>
+              {shown && <Numbers s={shown} />}
+            </>
+          )}
         </div>
       </section>
     </>

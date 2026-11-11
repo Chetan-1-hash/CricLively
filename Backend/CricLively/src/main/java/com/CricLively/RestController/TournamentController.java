@@ -84,6 +84,28 @@ public class TournamentController {
         }
     }
 
+    @PostMapping("/{id}/follow")
+    public ResponseEntity<?> follow(@PathVariable String id, Authentication auth) {
+        try {
+            return ResponseEntity.ok(tournamentService.follow(id, auth));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/follow")
+    public ResponseEntity<?> unfollow(@PathVariable String id, Authentication auth) {
+        try {
+            return ResponseEntity.ok(tournamentService.unfollow(id, auth));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/venue-exists")
     public ResponseEntity<List<String>> getVenue(){
         return ResponseEntity.ok(tournamentService.venuesList());

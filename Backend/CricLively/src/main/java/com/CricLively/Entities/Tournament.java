@@ -24,6 +24,7 @@ public class Tournament {
     private List<String> teamIds;
     private List<PointsTableEntry> pointsTableEntry;
 
+    private Set<String> followerIds;                // profile ids of people who follow it (can open it)
     private String createdBy;                       // profile id of the organizer who made it
     private List<TournamentExtension> extensions;   // every time the end date was moved
 

@@ -55,6 +55,10 @@ public class TournamentService {
         dto.setFinished(finished);
         dto.setTournamentStatus(finished ? TournamentStatus.FINISHED : tournament.getTournamentStatus());
         dto.setCanExtend(accessService.canExtendTournament(actor, tournament));
+        dto.setCanAccess(accessService.canAccessTournament(actor, tournament));
+        dto.setFollowing(actor.profileIdOrNull() != null && tournament.getFollowerIds() != null
+                && tournament.getFollowerIds().contains(actor.profileIdOrNull()));
+        dto.setFollowerCount(tournament.getFollowerIds() == null ? 0 : tournament.getFollowerIds().size());
 
         List<TournamentDashboardResponse.ExtensionInfo> list = new ArrayList<>();
         if (tournament.getExtensions() != null) {
@@ -163,6 +167,38 @@ public class TournamentService {
         tournamentRepository.save(t);
 
         liveScores.publishAll(); // lists unlock without a refresh
+        return mapToDashboardResponse(t, actor);
+    }
+
+    /** Follow = you can open the tournament, see its matches and get live updates. */
+    public TournamentDashboardResponse follow(String tournamentId, Authentication auth) {
+        Tournament t = tournamentRepository.findTournamentById(tournamentId);
+        if (t == null) throw new NoSuchElementException("Tournament not found");
+        MatchAccessService.Actor actor = accessService.actor(auth);
+        if (actor.profileIdOrNull() == null) throw new IllegalArgumentException("Only people with a profile can follow");
+
+        java.util.Set<String> ids = t.getFollowerIds() == null ? new java.util.LinkedHashSet<>() : new java.util.LinkedHashSet<>(t.getFollowerIds());
+        ids.add(actor.profileIdOrNull());
+        t.setFollowerIds(ids);
+        tournamentRepository.save(t);
+        return mapToDashboardResponse(t, actor);
+    }
+
+    public TournamentDashboardResponse unfollow(String tournamentId, Authentication auth) {
+        Tournament t = tournamentRepository.findTournamentById(tournamentId);
+        if (t == null) throw new NoSuchElementException("Tournament not found");
+        MatchAccessService.Actor actor = accessService.actor(auth);
+        String me = actor.profileIdOrNull();
+        if (me != null && (me.equals(t.getCreatedBy())
+                || (t.getOrganizerIds() != null && t.getOrganizerIds().contains(me)))) {
+            throw new IllegalArgumentException("You organize this tournament, so you always have access to it");
+        }
+        if (me != null && t.getFollowerIds() != null) {
+            java.util.Set<String> ids = new java.util.LinkedHashSet<>(t.getFollowerIds());
+            ids.remove(me);
+            t.setFollowerIds(ids);
+            tournamentRepository.save(t);
+        }
         return mapToDashboardResponse(t, actor);
     }
 

@@ -17,7 +17,9 @@ export async function addgalleryApi(file: File, year: number) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || "Upload failed!");
+    let message = text;
+    try { message = JSON.parse(text).message ?? text; } catch { /* plain text */ }
+    throw new Error(message || "Upload failed!");
   }
 
   return response.json();

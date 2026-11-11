@@ -56,6 +56,7 @@ public class SecurityConfig {
                         // ---------- 2. ADMIN only ----------
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/player/register/bulk", "/player/bulk/playerInfo").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/gallery/addImages").hasAnyRole("ORGANIZER", "ADMIN") // upload a photo
                         .requestMatchers(HttpMethod.POST, "/gallery/**").hasRole("ADMIN")
 
                         // ---------- 3. ORGANIZER (and ADMIN): create and run things ----------
@@ -71,6 +72,9 @@ public class SecurityConfig {
 
                         // ---------- 4. EVERY signed-in person: view + own profile ----------
                         .requestMatchers("/ws/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN") // live score connection
+                        .requestMatchers(HttpMethod.POST, "/tournaments/*/follow").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/tournaments/*/follow").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/stats/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
                         .requestMatchers("/profile/me", "/profile/me/**").hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/player/*/playerInfo")
                                 .hasAnyRole("PLAYER", "ORGANIZER", "ADMIN")

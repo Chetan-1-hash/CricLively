@@ -89,3 +89,16 @@ export async function extendTournamentAPI(
   const t = await api<TournamentResponse>(`/tournaments/${id}/extend`, { method: "POST", body });
   return { ...t, coverImage: t.coverImage ? `${API_URL}/images/${t.coverImage}` : "" };
 }
+
+const withImage = (t: TournamentResponse): TournamentResponse => ({
+  ...t,
+  coverImage: t.coverImage ? `${API_URL}/images/${t.coverImage}` : "",
+});
+
+export async function followTournamentAPI(id: string): Promise<TournamentResponse> {
+  return withImage(await api<TournamentResponse>(`/tournaments/${id}/follow`, { method: "POST" }));
+}
+
+export async function unfollowTournamentAPI(id: string): Promise<TournamentResponse> {
+  return withImage(await api<TournamentResponse>(`/tournaments/${id}/follow`, { method: "DELETE" }));
+}

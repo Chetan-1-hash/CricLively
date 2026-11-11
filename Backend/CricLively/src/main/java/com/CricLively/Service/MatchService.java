@@ -38,6 +38,9 @@ public class MatchService {
                 .collect(Collectors.toMap(Tournament::getId, t -> t, (a, b) -> a));
 
         return matchRepository.findAll().stream()
+                // matches of a tournament you do not follow stay hidden
+                .filter(match -> match.getTournamentId() == null
+                        || accessService.canAccessTournament(actor, tournaments.get(match.getTournamentId())))
                 .map(match -> {
                     Tournament tournament = match.getTournamentId() == null
                             ? null
@@ -55,6 +58,10 @@ public class MatchService {
         Tournament tournament = tournamentRepository.findTournamentById(tournamentId);
         if (tournament == null) {
             return List.of();
+        }
+        if (!accessService.canAccessTournament(actor, tournament)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Follow \"" + tournament.getName() + "\" to open it.");
         }
 
         return matchRepository.findByTournamentId(tournamentId)

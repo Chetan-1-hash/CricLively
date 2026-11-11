@@ -77,6 +77,18 @@ public class MatchAccessService {
         return false;
     }
 
+    /**
+     * Who may open a tournament: admin, the organizer who made it, its listed organizers,
+     * and anybody who follows it. A single match (no tournament) is open to everybody.
+     */
+    public boolean canAccessTournament(Actor a, Tournament t) {
+        if (t == null || a.admin) return true;
+        if (a.profileId == null) return false;
+        if (a.profileId.equals(t.getCreatedBy())) return true;
+        if (t.getOrganizerIds() != null && t.getOrganizerIds().contains(a.profileId)) return true;
+        return t.getFollowerIds() != null && t.getFollowerIds().contains(a.profileId);
+    }
+
     /** Who may extend a tournament: admin, the organizer who made it, or its listed organizers. */
     public boolean canExtendTournament(Actor a, Tournament t) {
         if (a.admin) return true;

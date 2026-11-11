@@ -22,7 +22,10 @@ export async function getTournamentMatches(tournamentId: string): Promise<MatchR
     });
 
     if (!response.ok) {
-        throw new Error("Failed to fetch matches");
+        const body = await response.json().catch(() => null);
+        const err = new Error(body?.message ?? "Failed to fetch matches") as Error & { status?: number };
+        err.status = response.status;
+        throw err;
     }
 
     const data = await response.json();

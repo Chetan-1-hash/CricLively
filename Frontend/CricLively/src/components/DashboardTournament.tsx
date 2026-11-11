@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TournamentResponse } from "./data/TournamentEntity";
 import { toast } from "../hooks/use-toast";
-import TournamentAPI from "../API/TournamentAPI";
+import TournamentAPI, { followTournamentAPI, unfollowTournamentAPI } from "../API/TournamentAPI";
+import { isAdmin } from "../lib/auth";
 
 
 export default function DashboardTournament() {
@@ -33,6 +34,34 @@ export default function DashboardTournament() {
       });
     }
   }
+
+  const admin = isAdmin();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const toggleFollow = async (t: TournamentResponse) => {
+    setBusyId(t.id);
+    try {
+      const updated = t.following ? await unfollowTournamentAPI(t.id) : await followTournamentAPI(t.id);
+      setTournaments((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+      toast({ title: updated.following ? "Following" : "Unfollowed", description: updated.name, duration: 2000 });
+    } catch (e) {
+      toast({ title: "Could not change follow", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const openTournament = (t: TournamentResponse) => {
+    if (!t.canAccess) {
+      toast({
+        title: "Follow this tournament first",
+        description: `Press "Follow" on ${t.name} to open its matches.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    navigate(`/matchesDashboard`, { state: { tournament: t } });
+  };
 
   const handleActionClick = (action: string) => {
     setDropdownOpen(false);
@@ -143,14 +172,29 @@ export default function DashboardTournament() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="mt-4 w-full py-2.5 bg-accent text-accent-foreground rounded-full font-semibold text-sm shadow-md hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/matchesDashboard`,{
-                    state: {
-                      tournament: tournament,
-                    },
-                  })}
+                  onClick={() => openTournament(tournament)}
                 >
                   View Tournament
                 </motion.button>
+
+                {/* admins see everything; everybody else follows what they want to open */}
+                {!admin && (
+                  tournament.canAccess && !tournament.following ? (
+                    <p className="mt-2 text-center text-xs text-foreground/60">You organize this tournament</p>
+                  ) : (
+                    <button
+                      onClick={() => toggleFollow(tournament)}
+                      disabled={busyId === tournament.id}
+                      className={`mt-2 w-full py-2 rounded-full text-sm font-semibold disabled:opacity-60 ${
+                        tournament.following
+                          ? "border-2 border-foreground/30 text-foreground"
+                          : "bg-red-600 text-white"
+                      }`}
+                    >
+                      {tournament.following ? "Following ✓ (tap to unfollow)" : "Follow to open"}
+                    </button>
+                  )
+                )}
               </motion.div>
             ))}
           </div>
