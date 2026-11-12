@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "../hooks/use-toast";
@@ -7,6 +7,9 @@ import { buildScoreState } from "../lib/scoreAdapter";
 import { useLiveUpdates } from "../lib/useLiveUpdates";
 import type { MatchScoreState } from "./data/MatchScoringTypes";
 import Navbar from "./Navbar";
+import { PageSpinner } from "./Spinner";
+import BallCelebration, { type Celebration } from "./BallCelebration";
+import type { ScoreboardResponse } from "../API/ScoringAPI";
 import { describeResult } from "../lib/matchResult";
 import type { InningsState } from "./data/MatchScoringTypes";
 
@@ -18,6 +21,35 @@ export default function ViewerPage() {
   const [state, setState] = useState<MatchScoreState | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"scorecard" | "timeline">("scorecard");
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const seenBalls = useRef<number | null>(null); // how many balls we had last time (null = first load)
+  const endCelebration = useCallback(() => setCelebration(null), []);
+
+  // When a new ball arrives while watching: a four, a six or a wicket plays an animation.
+  // The first load never animates, and neither does an undo (fewer balls than before).
+  const celebrate = (data: ScoreboardResponse) => {
+    const first = data.balls1 ?? [];
+    const second = data.balls2 ?? [];
+    const total = first.length + second.length;
+    const before = seenBalls.current;
+    seenBalls.current = total;
+    if (before === null || total <= before || data.matchStatus === "UPCOMING") return;
+
+    const last = second.length > 0 ? second[second.length - 1] : first[first.length - 1];
+    if (!last) return;
+    const nameOf = (id?: string | null) => (id ? data.playerNames[id] ?? "Player" : "");
+    if (last.wicket) {
+      const how: Record<string, string> = {
+        BOWLED: "Bowled", CAUGHT: "Caught", LBW: "LBW", RUNOUT: "Run out", STUMPED: "Stumped",
+        HITWICKET: "Hit wicket", RETIRED_HURT: "Retired hurt",
+      };
+      setCelebration({ id: Date.now(), kind: "WICKET", who: nameOf(last.wicket.playerOutId ?? last.strikerId), detail: how[last.wicket.outType] });
+    } else if (last.runsBatsman === 6) {
+      setCelebration({ id: Date.now(), kind: "SIX", who: nameOf(last.strikerId) });
+    } else if (last.runsBatsman === 4) {
+      setCelebration({ id: Date.now(), kind: "FOUR", who: nameOf(last.strikerId) });
+    }
+  };
 
   useEffect(() => {
     loadScore();
@@ -34,6 +66,7 @@ export default function ViewerPage() {
     if (!matchId) return;
     try {
       const data = await getScoreboard(matchId);
+      celebrate(data);
       setState(buildScoreState(data));
     } catch (error) {
       if (!silent) {
@@ -50,9 +83,7 @@ export default function ViewerPage() {
 
   if (loading || !state) {
     return (
-      <section className="min-h-[100vh] flex items-center justify-center bg-background/80">
-        <p className="text-foreground/70 text-lg">Loading scoreboard…</p>
-      </section>
+      <PageSpinner label="Loading scoreboard…" />
     );
   }
 
@@ -100,7 +131,8 @@ export default function ViewerPage() {
 
   return (
     <>
-    <Navbar />
+    <BallCelebration event={celebration} onDone={endCelebration} />
+      <Navbar />
       <section className="min-h-[100vh] relative py-12 bg-background/80">
       <div className="container my-8 mx-auto px-6 relative max-w-4xl">
         {/* Header */}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageSpinner } from "./Spinner";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { fetchMe } from "../API/PlayerAPI";
 import { toast } from "../hooks/use-toast";
@@ -58,9 +59,7 @@ export default function RequireRole({ roles }: { roles?: Role[] }) {
   if (!current) {
     if (checking) {
       return (
-        <div className="min-h-[100vh] flex items-center justify-center text-foreground/70">
-          Loading…
-        </div>
+        <PageSpinner label="Checking your login…" />
       );
     }
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

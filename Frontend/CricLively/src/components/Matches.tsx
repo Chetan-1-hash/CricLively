@@ -5,6 +5,7 @@ import { useLiveUpdates } from "../lib/useLiveUpdates";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
 import { useEffect, useState } from "react";
+import { SectionSpinner } from "./Spinner";
 import { useNavigate } from "react-router-dom";
 import { MatchResponse } from "./data/MatchEntity";
 import { getAllMatches } from "../API/MatchApi";
@@ -20,6 +21,7 @@ export default function Matches() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [accessMatchId, setAccessMatchId] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchResponse[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<MatchStatus>("UPCOMING");
 
   useEffect(() => {
@@ -35,6 +37,8 @@ export default function Matches() {
       setMatches(data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,6 +131,7 @@ export default function Matches() {
             ))}
           </div>
 
+          {loading && <SectionSpinner label="Loading matches…" />}
           {/* Match Cards */}
           <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredMatches.map((match) => (

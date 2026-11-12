@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SectionSpinner } from "./Spinner";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -88,7 +89,7 @@ export default function AdminProfiles() {
             className="w-full mb-5 px-4 py-3 rounded-xl bg-background/70 border border-border text-sm"
           />
 
-          {loading && <p className="text-center text-foreground/70">Loading…</p>}
+          {loading && <SectionSpinner label="Loading people…" />}
           {error && <p className="text-center text-red-600">{error}</p>}
           {!loading && !error && shown.length === 0 && (
             <p className="text-center text-foreground/70">No users found.</p>

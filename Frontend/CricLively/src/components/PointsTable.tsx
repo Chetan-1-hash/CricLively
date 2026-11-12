@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getPointsTable, type PointsRow } from "../API/TournamentTablesAPI";
 import { useLiveUpdates } from "../lib/useLiveUpdates";
+import { SectionSpinner } from "./Spinner";
 
 const FORM_STYLE: Record<string, string> = {
   W: "bg-green-700 text-white",
@@ -30,7 +31,7 @@ export default function PointsTable({ tournamentId }: { tournamentId: string }) 
   useLiveUpdates("*", load);
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!rows) return <p className="text-foreground/70">Loading…</p>;
+  if (!rows) return <SectionSpinner label="Loading points table…" />;
   if (rows.length === 0) return <p className="text-foreground/70">No teams in this tournament yet.</p>;
 
   return (

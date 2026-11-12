@@ -94,6 +94,7 @@ public class StatsService {
         boolean batted = false, out = false, bowled = false;
         int runs = 0, faced = 0, fours = 0, sixes = 0;
         int legalBowled = 0, conceded = 0, wickets = 0;
+        int catches = 0, stumpings = 0, runOuts = 0, assists = 0;
 
         for (BallByBall b : balls) {
             int bat = b.getRunsBatsman() == null ? 0 : b.getRunsBatsman();
@@ -118,6 +119,18 @@ public class StatsService {
                 batted = true;
             }
 
+            // ---- fielding: who took the catch / stumping / run-out (or helped in it)
+            if (w != null) {
+                Wicket.OutType type = w.getOutType();
+                if (type == Wicket.OutType.CAUGHT && pid.equals(w.getFielderId())) catches++;
+                if (type == Wicket.OutType.CAUGHT_BOWLED && pid.equals(w.getBowlerId())) catches++;
+                if (type == Wicket.OutType.STUMPED && pid.equals(w.getFielderId())) stumpings++;
+                if (type == Wicket.OutType.RUNOUT) {
+                    if (pid.equals(w.getFielderId())) runOuts++;
+                    if (w.getAssistFielderIds() != null && w.getAssistFielderIds().contains(pid)) assists++;
+                }
+            }
+
             // ---- bowling (byes and leg byes are not the bowler's runs)
             if (pid.equals(b.getBowlerId())) {
                 bowled = true;
@@ -126,6 +139,11 @@ public class StatsService {
                 if (w != null && pid.equals(w.getBowlerId()) && Boolean.TRUE.equals(w.getIsBowlerCredit())) wickets++;
             }
         }
+
+        s.setCatches(s.getCatches() + catches);
+        s.setStumpings(s.getStumpings() + stumpings);
+        s.setRunOuts(s.getRunOuts() + runOuts);
+        s.setRunOutAssists(s.getRunOutAssists() + assists);
 
         if (batted) {
             s.setBattingInnings(s.getBattingInnings() + 1);

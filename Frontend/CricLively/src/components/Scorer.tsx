@@ -15,6 +15,7 @@ import { buildScoreState, toApiBall } from "../lib/scoreAdapter";
 import type { ExtraType, WicketType } from "./data/MatchScoringTypes";
 import { scoringReducer } from "./data/scoringReducer";
 import Navbar from "./Navbar";
+import { PageSpinner } from "./Spinner";
 import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
 import LineupPanel from "./LineupPanel";
 import { useLiveUpdates } from "../lib/useLiveUpdates";
@@ -144,9 +145,7 @@ export default function Scorer() {
 
   if (loading || !sb) {
     return (
-      <section className="min-h-[100vh] flex items-center justify-center bg-background/80">
-        <p className="text-foreground/70 text-lg">Loading scorer…</p>
-      </section>
+      <PageSpinner label="Loading scorer…" />
     );
   }
 

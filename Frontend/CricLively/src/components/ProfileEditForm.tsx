@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SectionSpinner } from "./Spinner";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -169,7 +170,7 @@ export default function ProfileEditForm({ mode }: { mode: "self" | "admin" }) {
           {profile && <p className="text-center text-xs text-foreground/60 mb-6">{profile.email}</p>}
 
           {error && <p className="text-center text-red-600">{error}</p>}
-          {!error && !profile && <p className="text-center text-foreground/70">Loading…</p>}
+          {!error && !profile && <SectionSpinner label="Loading profile…" />}
 
           {profile && (
             <div className="space-y-4">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SectionSpinner } from "./Spinner";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -90,7 +91,7 @@ export default function ProfilePage() {
           className="w-full max-w-md bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl"
         >
           {error && <p className="text-center text-red-600">{error}</p>}
-          {!error && !me && <p className="text-center text-foreground/70">Loading your profile…</p>}
+          {!error && !me && <SectionSpinner label="Loading your profile…" />}
 
           {me && (
             <>

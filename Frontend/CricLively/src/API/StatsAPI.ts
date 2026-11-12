@@ -20,6 +20,10 @@ export interface StatLine {
   wickets: number;
   bestFigures: string;
   economy: number;
+  catches: number;
+  stumpings: number;
+  runOuts: number;
+  runOutAssists: number;
 }
 
 export interface TournamentStats {

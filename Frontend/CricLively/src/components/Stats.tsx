@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Navbar from "./Navbar";
+import { SectionSpinner } from "./Spinner";
 import { getMyStats, type PersonalStats, type StatLine } from "../API/StatsAPI";
 
 function Card({ title, rows }: { title: string; rows: [string, string | number][] }) {
@@ -48,6 +49,17 @@ function Numbers({ s }: { s: StatLine }) {
           ["Economy", s.economy.toFixed(2)],
         ]}
       />
+      <div className="md:col-span-2">
+        <Card
+          title="Fielding"
+          rows={[
+            ["Catches", s.catches],
+            ["Stumpings", s.stumpings],
+            ["Run-outs", s.runOuts],
+            ["Run-out assists", s.runOutAssists],
+          ]}
+        />
+      </div>
     </div>
   );
 }
@@ -85,7 +97,7 @@ export default function Stats() {
           </p>
 
           {error && <p className="text-red-600">{error}</p>}
-          {!error && !data && <p className="text-foreground/70">Loading…</p>}
+          {!error && !data && <SectionSpinner label="Loading your stats…" />}
 
           {data && data.overall.matches === 0 && (
             <div className="bg-card/80 rounded-3xl p-8 text-center shadow-2xl">

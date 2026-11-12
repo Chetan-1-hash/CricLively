@@ -23,6 +23,7 @@ import ViewerPage from "./components/viewer";
 import Scorer from "./components/Scorer";
 import ProfilePage from "./components/ProfilePage";
 import RequireRole from "./components/RequireRole";
+import GlobalSpinner from "./components/GlobalSpinner";
 import ProfileEditForm from "./components/ProfileEditForm";
 import AdminProfiles from "./components/AdminProfiles";
 import type { Role } from "./lib/auth";
@@ -36,6 +37,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
+      <GlobalSpinner />
       <Sonner />
       <BrowserRouter>
         <Routes>

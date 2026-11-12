@@ -1,15 +1,21 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import * as XLSX from "xlsx";
 import Navbar from "./Navbar";
 import { toast } from "../hooks/use-toast";
 import {
   CATEGORY_INFO,
+  defaultConfig,
+  downloadConfigTemplate,
   exportExcel,
+  exportPdf,
   generateTeams,
+  parseConfig,
   type Category,
   type GeneratedTeams,
+  type TeamConfig,
 } from "../lib/teamGeneration";
+import { Spinner } from "./Spinner";
 
 const CATEGORIES: Category[] = ["men", "women", "boys", "girls"];
 const EMPTY: GeneratedTeams = { men: [], women: [], boys: [], girls: [] };
@@ -22,7 +28,35 @@ export default function TeamGeneration() {
   const [selected, setSelected] = useState<Record<Category, boolean>>({ men: false, women: false, boys: false, girls: false });
   const [sizes, setSizes] = useState<Record<Category, number>>({ men: 7, women: 7, boys: 7, girls: 7 });
   const [teams, setTeams] = useState<GeneratedTeams>(EMPTY);
-  const outputRef = useRef<HTMLDivElement>(null);
+  const [config, setConfig] = useState<TeamConfig>(defaultConfig());
+  const [configSummary, setConfigSummary] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  // optional second file: MVP players (with values) and team names
+  const onConfigFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target?.result as ArrayBuffer, { type: "array" });
+        const { config: c, summary } = parseConfig(wb, file.name);
+        setConfig(c);
+        setConfigSummary(summary);
+        setTeams(EMPTY);
+        toast({ title: "MVP / team names file loaded", description: summary });
+      } catch (err) {
+        toast({ title: "Could not use that file", description: (err as Error).message, variant: "destructive" });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  const resetConfig = () => {
+    setConfig(defaultConfig());
+    setConfigSummary("");
+    setTeams(EMPTY);
+  };
 
   const chosen = CATEGORIES.filter((c) => selected[c]);
   const hasOutput = chosen.some((c) => teams[c].length > 0);
@@ -57,7 +91,7 @@ export default function TeamGeneration() {
       return;
     }
     try {
-      const result = generateTeams({ workbook, sizes });
+      const result = generateTeams({ workbook, sizes, config });
       setTeams(result);
       const empty = chosen.filter((c) => result[c].length === 0).map((c) => CATEGORY_INFO[c].sheet);
       if (empty.length > 0) {
@@ -73,25 +107,22 @@ export default function TeamGeneration() {
   };
 
   const pdf = async () => {
-    if (!outputRef.current || !hasOutput) {
+    if (!hasOutput) {
       toast({ title: "Nothing to export", description: "Generate the teams first.", variant: "destructive" });
       return;
     }
+    setPdfBusy(true);
     try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-      const canvas = await html2canvas(outputRef.current, { scale: 2, backgroundColor: "#ffffff" });
-      const w = canvas.width / 2;
-      const h = canvas.height / 2;
-      const doc = new jsPDF({ orientation: w > h ? "landscape" : "portrait", unit: "px", format: [w, h] });
-      doc.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h);
-      doc.save("Generated_Teams.pdf");
-    } catch {
-      toast({ title: "Could not create the PDF", variant: "destructive" });
+      await exportPdf(teams, chosen, config.teamNames);
+    } catch (e) {
+      toast({ title: "Could not create the PDF", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setPdfBusy(false);
     }
   };
 
   const excel = () => {
-    if (!exportExcel(teams, chosen)) {
+    if (!exportExcel(teams, chosen, config.teamNames)) {
       toast({ title: "Nothing to export", description: "Generate the teams first.", variant: "destructive" });
     }
   };
@@ -139,6 +170,28 @@ export default function TeamGeneration() {
             </div>
           </div>
 
+          <div className="rounded-2xl bg-background/50 p-3">
+            <label className="block text-sm font-semibold text-foreground mb-1">MVP players and team names (optional)</label>
+            <input type="file" accept=".xlsx,.xls" onChange={onConfigFile} className="text-sm text-foreground" />
+            <p className="text-xs text-foreground/60 mt-2">
+              Sheet "MVP": FullName and, if you have them, Value. Sheet "Teams": columns Men, Women, Boys, Girls with the
+              team names. With values, the strongest MVPs are spread first, in a snake order, so teams stay balanced.
+            </p>
+            <p className="text-xs mt-1 text-foreground/80">
+              {config.source ? `Using ${config.source}: ${configSummary}` : "Using the built-in lists."}
+            </p>
+            <div className="flex gap-3 mt-2">
+              <button onClick={downloadConfigTemplate} className="text-xs font-semibold underline text-foreground/70">
+                Download example file
+              </button>
+              {config.source && (
+                <button onClick={resetConfig} className="text-xs font-semibold underline text-foreground/70">
+                  Use built-in lists
+                </button>
+              )}
+            </div>
+          </div>
+
           {chosen.length > 0 && (
             <div className="space-y-3">
               {chosen.map((c) => (
@@ -161,7 +214,7 @@ export default function TeamGeneration() {
               Generate Teams
             </button>
             <button onClick={pdf} className="flex-1 py-2.5 rounded-full border-2 border-red-600 text-red-600 text-sm font-semibold">
-              Export PDF
+              {pdfBusy ? <Spinner label="Creating…" size={16} /> : "Export PDF"}
             </button>
             <button onClick={excel} className="flex-1 py-2.5 rounded-full border-2 border-red-600 text-red-600 text-sm font-semibold">
               Export Excel
@@ -170,7 +223,7 @@ export default function TeamGeneration() {
         </motion.div>
 
         {hasOutput && (
-          <div ref={outputRef} className="w-full max-w-6xl mt-10 p-4 bg-white rounded-3xl text-black">
+          <div className="w-full max-w-6xl mt-10 p-4 bg-white rounded-3xl text-black">
             {chosen.map(
               (c) =>
                 teams[c].length > 0 && (
@@ -182,7 +235,7 @@ export default function TeamGeneration() {
                           <thead>
                             <tr>
                               <th className="bg-red-600 text-white px-3 py-2 text-left">
-                                {CATEGORY_INFO[c].teamNames[i] || `Team-${i + 1}`}
+                                {config.teamNames[c][i] || `Team-${i + 1}`}
                               </th>
                             </tr>
                           </thead>

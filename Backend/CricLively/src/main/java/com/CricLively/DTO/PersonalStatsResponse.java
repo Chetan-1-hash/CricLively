@@ -46,6 +46,12 @@ public class PersonalStatsResponse {
         private String bestFigures = "-";
         private double economy;
 
+        // fielding
+        private int catches;
+        private int stumpings;
+        private int runOuts;
+        private int runOutAssists;
+
         // helpers used while counting (not shown)
         private transient int outs;
         private transient int bestW = -1;

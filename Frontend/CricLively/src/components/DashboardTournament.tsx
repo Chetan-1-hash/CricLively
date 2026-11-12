@@ -6,6 +6,7 @@ import { TournamentResponse } from "./data/TournamentEntity";
 import { toast } from "../hooks/use-toast";
 import TournamentAPI, { followTournamentAPI, unfollowTournamentAPI } from "../API/TournamentAPI";
 import { isAdmin } from "../lib/auth";
+import { SectionSpinner } from "./Spinner";
 
 
 export default function DashboardTournament() {
@@ -13,6 +14,7 @@ export default function DashboardTournament() {
   const organizer = canOrganize(); // only organizers/admins see the create menu
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const handleDropdownToggle = () => setDropdownOpen(!dropdownOpen);
 
@@ -32,6 +34,8 @@ export default function DashboardTournament() {
         variant: "destructive",
         description: "Error while fetching data."
       });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -122,6 +126,7 @@ export default function DashboardTournament() {
             )}
           </div>
 
+          {loading && <SectionSpinner label="Loading tournaments…" />}
           {/* Tournament Grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {tournaments.map((tournament, index) => (

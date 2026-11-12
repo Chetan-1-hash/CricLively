@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SectionSpinner } from "./Spinner";
 import { motion } from "framer-motion";
 import { getAccess, setScorers, type MatchAccess } from "../API/ScoringAPI";
 import { ProfileListAPI } from "../API/ProfileAPI";
@@ -75,7 +76,7 @@ export default function ScorerAccessDialog({ matchId, onClose }: { matchId: stri
         </p>
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
-        {!error && !access && <p className="text-foreground/70 text-sm">Loading…</p>}
+        {!error && !access && <SectionSpinner label="Loading…" />}
 
         {access && (
           <>

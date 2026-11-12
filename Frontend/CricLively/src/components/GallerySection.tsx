@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Navbar from "./Navbar";
 import { getgalleryApi, addgalleryApi } from "../API/GalleryApi";
 import { canOrganize } from "../lib/auth";
+import { SectionSpinner, Spinner } from "./Spinner";
 import { Gallery } from "./data/DTO";
 import { toast } from "../hooks/use-toast";
 
@@ -20,6 +21,7 @@ export default function GallerySection() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadYear, setUploadYear] = useState<number>(thisYear);
   const [uploading, setUploading] = useState(false);
+  const [loadingImages, setLoadingImages] = useState(true);
 
   const upload = async () => {
     if (!file) {
@@ -64,6 +66,8 @@ export default function GallerySection() {
           description: "Failed to fetch gallery",
           variant: "destructive"
         });
+      } finally {
+        setLoadingImages(false);
       }
   }
 
@@ -118,7 +122,7 @@ export default function GallerySection() {
                 disabled={uploading || !file}
                 className="px-5 py-2 rounded-full bg-red-600 text-white text-sm font-semibold disabled:opacity-60"
               >
-                {uploading ? "Uploading…" : "Upload photo"}
+                {uploading ? <Spinner label="Uploading…" size={16} className="text-white" /> : "Upload photo"}
               </button>
             </div>
           )}
@@ -160,6 +164,7 @@ export default function GallerySection() {
             layout
             className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8"
           >
+            {loadingImages && <div className="col-span-full"><SectionSpinner label="Loading photos…" /></div>}
             <AnimatePresence>
               {filteredImages.map((img, index) => (
                 <motion.div

@@ -14,6 +14,7 @@ import { minimalScores } from "../lib/matchScore";
 import TournamentListAPI from "../API/TournamentAPI";
 import { toast } from "../hooks/use-toast";
 import ExtendTournamentDialog from "./ExtendTournamentDialog";
+import { SectionSpinner } from "./Spinner";
 import PointsTable from "./PointsTable";
 import Leaderboard from "./Leaderboard";
 import type { TournamentResponse } from "./data/TournamentEntity";
@@ -74,6 +75,8 @@ export default function DashboardMatches() {
     loadTournament();
   });
 
+  const [loadingMatches, setLoadingMatches] = useState(true);
+
   const loadAllMatches = async () => {
     if (!tournamentDetails) return;
     try {
@@ -87,6 +90,8 @@ export default function DashboardMatches() {
         return;
       }
       console.error(err);
+    } finally {
+      setLoadingMatches(false);
     }
   };
 
@@ -312,6 +317,7 @@ export default function DashboardMatches() {
                   ))}
                 </div>
 
+                {loadingMatches && <SectionSpinner label="Loading matches…" />}
                 {/* MATCH CARDS */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredMatches.length > 0 ? (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getLeaderboard, type LeaderboardData, type LeaderPlayer } from "../API/TournamentTablesAPI";
 import { useLiveUpdates } from "../lib/useLiveUpdates";
+import { SectionSpinner } from "./Spinner";
 
 type Tab = "bat" | "bowl" | "mvp";
 
@@ -35,7 +36,7 @@ export default function Leaderboard({ tournamentId }: { tournamentId: string }) 
   }, [data, tab]);
 
   if (error) return <p className="text-red-600">{error}</p>;
-  if (!data) return <p className="text-foreground/70">Loading…</p>;
+  if (!data) return <SectionSpinner label="Loading leaderboard…" />;
 
   return (
     <>
