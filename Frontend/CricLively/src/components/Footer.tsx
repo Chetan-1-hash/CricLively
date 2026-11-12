@@ -12,13 +12,6 @@ export default function Footer() {
             CricLively
           </motion.div>
           
-          <div className="flex items-center gap-10">
-            <a href="#" className="text-foreground/70 hover:text-foreground transition-colors">Home</a>
-            <a href="#matches" className="text-foreground/70 hover:text-foreground transition-colors">Matches</a>
-            <a href="#teams" className="text-foreground/70 hover:text-foreground transition-colors">Teams</a>
-            <a href="#stats" className="text-foreground/70 hover:text-foreground transition-colors">Stats</a>
-          </div>
-          
           <div className="flex items-center gap-4">
             <motion.a 
               href="#" 

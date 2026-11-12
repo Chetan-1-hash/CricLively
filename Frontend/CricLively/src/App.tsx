@@ -9,6 +9,7 @@ import Login from "./components/Login";
 import Registration from "./components/Registration";
 import Matches from "./components/Matches";
 import Stats from "./components/Stats";
+import TeamGeneration from "./components/TeamGeneration";
 import PlayerCricketDetails from "./components/PlayerCricketDetails";
 import DashboardTournament from "./components/DashboardTournament";
 import CreateTeam from "./components/CreateTeam";
@@ -68,6 +69,7 @@ const App = () => (
             {/* SCOREBOARD: every logged-in person */}
             <Route path="/viewer/:matchId" element={<ViewerPage />} />
             <Route path="/stats" element={<Stats />} />
+            <Route path="/team-generation" element={<TeamGeneration />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<ProfileEditForm mode="self" />} />
             <Route path="/player/:playerId" element={<PlayerCricketDetails />} />

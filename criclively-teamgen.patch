@@ -1,0 +1,979 @@
+diff --git a/Frontend/CricLively/package-lock.json b/Frontend/CricLively/package-lock.json
+index 23bc052..0901fea 100644
+--- a/Frontend/CricLively/package-lock.json
++++ b/Frontend/CricLively/package-lock.json
+@@ -46,7 +46,9 @@
+         "cmdk": "^1.1.1",
+         "embla-carousel-react": "^8.6.0",
+         "framer-motion": "^12.26.2",
++        "html2canvas": "^1.4.1",
+         "input-otp": "^1.4.2",
++        "jspdf": "^2.5.2",
+         "lucide-react": "^0.562.0",
+         "next-themes": "^0.4.6",
+         "radix-ui": "^1.4.3",
+@@ -63,6 +65,7 @@
+         "tailwind-merge": "^3.4.0",
+         "three": "^0.182.0",
+         "vaul": "^1.1.2",
++        "xlsx": "^0.18.5",
+         "zustand": "^5.0.10"
+       },
+       "devDependencies": {
+@@ -4303,6 +4306,13 @@
+       "integrity": "sha512-ieXiYmgSRXUDeOntE1InxjWyvEelZGP63M+cGuquuRLuIKKT1osnkXjxev9B7d1nXSug5vpunx+gNlbVxMlC9A==",
+       "license": "MIT"
+     },
++    "node_modules/@types/raf": {
++      "version": "3.4.3",
++      "resolved": "https://registry.npmjs.org/@types/raf/-/raf-3.4.3.tgz",
++      "integrity": "sha512-c4YAvMedbPZ5tEyxzQdMoOhhJ4RD3rngZIdwC2/qDN3d7JpEhB6fiBRKVY1lg5B7Wk+uPBjn5f39j1/2MY1oOw==",
++      "license": "MIT",
++      "optional": true
++    },
+     "node_modules/@types/react": {
+       "version": "19.2.8",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.2.8.tgz",
+@@ -4701,6 +4711,15 @@
+         "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0"
+       }
+     },
++    "node_modules/adler-32": {
++      "version": "1.3.1",
++      "resolved": "https://registry.npmjs.org/adler-32/-/adler-32-1.3.1.tgz",
++      "integrity": "sha512-ynZ4w/nUUv5rrsR8UUGoe1VC9hZj6V5hU9Qw1HlMDJGEJw5S7TfTErWTjMys6M7vr0YWcPqs3qAr4ss0nDfP+A==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/ajv": {
+       "version": "6.12.6",
+       "resolved": "https://registry.npmjs.org/ajv/-/ajv-6.12.6.tgz",
+@@ -4771,6 +4790,18 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/atob": {
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/atob/-/atob-2.1.2.tgz",
++      "integrity": "sha512-Wm6ukoaOGJi/73p/cl2GvLjTI5JM1k/O14isD73YML8StrH/7/lRFgmg8nICZgD3bZZvjwCGxtMOD3wWNAu8cg==",
++      "license": "(MIT OR Apache-2.0)",
++      "bin": {
++        "atob": "bin/atob.js"
++      },
++      "engines": {
++        "node": ">= 4.5.0"
++      }
++    },
+     "node_modules/autoprefixer": {
+       "version": "10.4.23",
+       "resolved": "https://registry.npmjs.org/autoprefixer/-/autoprefixer-10.4.23.tgz",
+@@ -4823,6 +4854,15 @@
+         "node": "*"
+       }
+     },
++    "node_modules/base64-arraybuffer": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/base64-arraybuffer/-/base64-arraybuffer-1.0.2.tgz",
++      "integrity": "sha512-I3yl4r9QB5ZRY3XuJVEPfc2XhZO6YweFPI+UovAzn+8/hb3oJ6lnysaFcjVpkCPfVWFUDvoZ8kmVDP7WyRtYtQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6.0"
++      }
++    },
+     "node_modules/base64-js": {
+       "version": "1.5.1",
+       "resolved": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+@@ -4906,6 +4946,18 @@
+         "node": "^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7"
+       }
+     },
++    "node_modules/btoa": {
++      "version": "1.2.1",
++      "resolved": "https://registry.npmjs.org/btoa/-/btoa-1.2.1.tgz",
++      "integrity": "sha512-SB4/MIGlsiVkMcHmT+pSmIPoNDoHg+7cMzmt3Uxt628MTz2487DKSqK/fuhFBrkuqrYv5UCEnACpF4dTFNKc/g==",
++      "license": "(MIT OR Apache-2.0)",
++      "bin": {
++        "btoa": "bin/btoa.js"
++      },
++      "engines": {
++        "node": ">= 0.4.0"
++      }
++    },
+     "node_modules/buffer": {
+       "version": "6.0.3",
+       "resolved": "https://registry.npmjs.org/buffer/-/buffer-6.0.3.tgz",
+@@ -4974,6 +5026,39 @@
+       ],
+       "license": "CC-BY-4.0"
+     },
++    "node_modules/canvg": {
++      "version": "3.0.11",
++      "resolved": "https://registry.npmjs.org/canvg/-/canvg-3.0.11.tgz",
++      "integrity": "sha512-5ON+q7jCTgMp9cjpu4Jo6XbvfYwSB2Ow3kzHKfIyJfaCAOHLbdKPQqGKgfED/R5B+3TFFfe8pegYA+b423SRyA==",
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@babel/runtime": "^7.12.5",
++        "@types/raf": "^3.4.0",
++        "core-js": "^3.8.3",
++        "raf": "^3.4.1",
++        "regenerator-runtime": "^0.13.7",
++        "rgbcolor": "^1.0.1",
++        "stackblur-canvas": "^2.0.0",
++        "svg-pathdata": "^6.0.3"
++      },
++      "engines": {
++        "node": ">=10.0.0"
++      }
++    },
++    "node_modules/cfb": {
++      "version": "1.2.2",
++      "resolved": "https://registry.npmjs.org/cfb/-/cfb-1.2.2.tgz",
++      "integrity": "sha512-KfdUZsSOw19/ObEWasvBP/Ac4reZvAGauZhs6S/gqNhXhI7cKwvlH7ulj+dOEYnca4bm4SGo8C1bTAQvnTjgQA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "adler-32": "~1.3.0",
++        "crc-32": "~1.2.0"
++      },
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/chalk": {
+       "version": "4.1.2",
+       "resolved": "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz",
+@@ -5028,6 +5113,15 @@
+         "react-dom": "^18 || ^19 || ^19.0.0-rc"
+       }
+     },
++    "node_modules/codepage": {
++      "version": "1.15.0",
++      "resolved": "https://registry.npmjs.org/codepage/-/codepage-1.15.0.tgz",
++      "integrity": "sha512-3g6NUTPd/YtuuGrhMnOMRjFc+LJw/bnMp3+0r/Wcz3IXUuCosKRJvMphm5+Q+bvTVGcJJuRvVLuYba+WojaFaA==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/color-convert": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz",
+@@ -5103,6 +5197,33 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/core-js": {
++      "version": "3.51.0",
++      "resolved": "https://registry.npmjs.org/core-js/-/core-js-3.51.0.tgz",
++      "integrity": "sha512-7bDKx/5jm5MxzsXxc93g6Z2+4ZsuT/MddrfRmTDJNAkWsYWHU8EVNEsBiIEWnMAMCHMmRfUEjkuo3jeNBOIHRw==",
++      "hasInstallScript": true,
++      "license": "MIT",
++      "optional": true,
++      "engines": {
++        "node": "*"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/core-js"
++      }
++    },
++    "node_modules/crc-32": {
++      "version": "1.2.2",
++      "resolved": "https://registry.npmjs.org/crc-32/-/crc-32-1.2.2.tgz",
++      "integrity": "sha512-ROmzCKrTnOwybPcJApAA6WBWij23HVfGVNKqqrZpuyZOHqK2CwHSvpGuyt/UNNvaIjEd8X5IFGp4Mh+Ie1IHJQ==",
++      "license": "Apache-2.0",
++      "bin": {
++        "crc32": "bin/crc32.njs"
++      },
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/cross-env": {
+       "version": "7.0.3",
+       "resolved": "https://registry.npmjs.org/cross-env/-/cross-env-7.0.3.tgz",
+@@ -5135,6 +5256,15 @@
+         "node": ">= 8"
+       }
+     },
++    "node_modules/css-line-break": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/css-line-break/-/css-line-break-2.1.0.tgz",
++      "integrity": "sha512-FHcKFCZcAha3LwfVBhCQbW2nCNbkZXn7KVUJcsT5/P8YmfsVja0FMPJr0B903j/E69HUphKiV9iQArX8SDYA4w==",
++      "license": "MIT",
++      "dependencies": {
++        "utrie": "^1.0.2"
++      }
++    },
+     "node_modules/csstype": {
+       "version": "3.2.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+@@ -5364,6 +5494,13 @@
+         "node": ">=0.4.0"
+       }
+     },
++    "node_modules/dompurify": {
++      "version": "2.5.9",
++      "resolved": "https://registry.npmjs.org/dompurify/-/dompurify-2.5.9.tgz",
++      "integrity": "sha512-i6mvVmWN4xo9LrhCOZrDgSs9noW6nOahbrmzjRbPF36YPyj5Ue5lgok0MHDWkG7xzpWFO2OYttXdzM7rJxHvNA==",
++      "license": "(MPL-2.0 OR Apache-2.0)",
++      "optional": true
++    },
+     "node_modules/draco3d": {
+       "version": "1.5.7",
+       "resolved": "https://registry.npmjs.org/draco3d/-/draco3d-1.5.7.tgz",
+@@ -5817,6 +5954,15 @@
+       "dev": true,
+       "license": "ISC"
+     },
++    "node_modules/frac": {
++      "version": "1.1.2",
++      "resolved": "https://registry.npmjs.org/frac/-/frac-1.1.2.tgz",
++      "integrity": "sha512-w/XBfkibaTl3YDqASwfDUqkna4Z2p9cFSr1aHDt0WoMTECnRfBOv2WArlZILlqgWlmdIlALXGpM2AOhEk5W3IA==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/fraction.js": {
+       "version": "5.3.4",
+       "resolved": "https://registry.npmjs.org/fraction.js/-/fraction.js-5.3.4.tgz",
+@@ -5989,6 +6135,19 @@
+       "integrity": "sha512-E3a5VwgXimGHwpRGV+WxRTKeSp2DW5DI5MWv34ulL3t5UNmyJWCQ1KmLEHbYzcfThfXG8amBL+fCYPneGHC4VA==",
+       "license": "Apache-2.0"
+     },
++    "node_modules/html2canvas": {
++      "version": "1.4.1",
++      "resolved": "https://registry.npmjs.org/html2canvas/-/html2canvas-1.4.1.tgz",
++      "integrity": "sha512-fPU6BHNpsyIhr8yyMpTLLxAbkaK8ArIBcmZIRiBLiDhjeqvXolaEmDGmELFuX9I4xDcaKKcJl+TKZLqruBbmWA==",
++      "license": "MIT",
++      "dependencies": {
++        "css-line-break": "^2.1.0",
++        "text-segmentation": "^1.0.3"
++      },
++      "engines": {
++        "node": ">=8.0.0"
++      }
++    },
+     "node_modules/iconv-lite": {
+       "version": "0.4.24",
+       "resolved": "https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.4.24.tgz",
+@@ -6233,6 +6392,24 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/jspdf": {
++      "version": "2.5.2",
++      "resolved": "https://registry.npmjs.org/jspdf/-/jspdf-2.5.2.tgz",
++      "integrity": "sha512-myeX9c+p7znDWPk0eTrujCzNjT+CXdXyk7YmJq5nD5V7uLLKmSXnlQ/Jn/kuo3X09Op70Apm0rQSnFWyGK8uEQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@babel/runtime": "^7.23.2",
++        "atob": "^2.1.2",
++        "btoa": "^1.2.1",
++        "fflate": "^0.8.1"
++      },
++      "optionalDependencies": {
++        "canvg": "^3.0.6",
++        "core-js": "^3.6.0",
++        "dompurify": "^2.5.4",
++        "html2canvas": "^1.0.0-rc.5"
++      }
++    },
+     "node_modules/jstransform": {
+       "version": "11.0.3",
+       "resolved": "https://registry.npmjs.org/jstransform/-/jstransform-11.0.3.tgz",
+@@ -6843,6 +7020,13 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/performance-now": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/performance-now/-/performance-now-2.1.0.tgz",
++      "integrity": "sha512-7EAHlyLHI56VEIdK57uwHdHKIaAGbnXPiw0yWbarQZOKaKpvUIgW0jWRVLiatnM+XXlSwsanIBH/hzGMJulMow==",
++      "license": "MIT",
++      "optional": true
++    },
+     "node_modules/picocolors": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
+@@ -7159,6 +7343,16 @@
+         }
+       }
+     },
++    "node_modules/raf": {
++      "version": "3.4.1",
++      "resolved": "https://registry.npmjs.org/raf/-/raf-3.4.1.tgz",
++      "integrity": "sha512-Sq4CW4QhwOHE8ucn6J34MqtZCeWFP2aQSmrlroYgqAV1PjStIhJXxYuTgUIfkEk7zTLjmIjLmU5q+fbD1NnOJA==",
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "performance-now": "^2.1.0"
++      }
++    },
+     "node_modules/react": {
+       "version": "19.2.3",
+       "resolved": "https://registry.npmjs.org/react/-/react-19.2.3.tgz",
+@@ -7497,6 +7691,13 @@
+         "redux": "^5.0.0"
+       }
+     },
++    "node_modules/regenerator-runtime": {
++      "version": "0.13.11",
++      "resolved": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz",
++      "integrity": "sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==",
++      "license": "MIT",
++      "optional": true
++    },
+     "node_modules/require-from-string": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/require-from-string/-/require-from-string-2.0.2.tgz",
+@@ -7522,6 +7723,16 @@
+         "node": ">=4"
+       }
+     },
++    "node_modules/rgbcolor": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/rgbcolor/-/rgbcolor-1.0.1.tgz",
++      "integrity": "sha512-9aZLIrhRaD97sgVhtJOW6ckOEh6/GnvQtdVNfdZ6s67+3/XwLS9lBcQYzEEhYVeUowN7pRzMLsyGhK2i/xvWbw==",
++      "license": "MIT OR SEE LICENSE IN FEEL-FREE.md",
++      "optional": true,
++      "engines": {
++        "node": ">= 0.8.15"
++      }
++    },
+     "node_modules/rollup": {
+       "version": "4.55.1",
+       "resolved": "https://registry.npmjs.org/rollup/-/rollup-4.55.1.tgz",
+@@ -7647,6 +7858,28 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/ssf": {
++      "version": "0.11.2",
++      "resolved": "https://registry.npmjs.org/ssf/-/ssf-0.11.2.tgz",
++      "integrity": "sha512-+idbmIXoYET47hH+d7dfm2epdOMUDjqcB4648sTZ+t2JwoyBFL/insLfB/racrDmsKB3diwsDA696pZMieAC5g==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "frac": "~1.1.2"
++      },
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
++    "node_modules/stackblur-canvas": {
++      "version": "2.7.0",
++      "resolved": "https://registry.npmjs.org/stackblur-canvas/-/stackblur-canvas-2.7.0.tgz",
++      "integrity": "sha512-yf7OENo23AGJhBriGx0QivY5JP6Y1HbrrDI6WLt6C5auYZXlQrheoY8hD4ibekFKz1HOfE48Ww8kMWMnJD/zcQ==",
++      "license": "MIT",
++      "optional": true,
++      "engines": {
++        "node": ">=0.1.14"
++      }
++    },
+     "node_modules/stats-gl": {
+       "version": "2.4.2",
+       "resolved": "https://registry.npmjs.org/stats-gl/-/stats-gl-2.4.2.tgz",
+@@ -7708,6 +7941,16 @@
+         "react": ">=17.0"
+       }
+     },
++    "node_modules/svg-pathdata": {
++      "version": "6.0.3",
++      "resolved": "https://registry.npmjs.org/svg-pathdata/-/svg-pathdata-6.0.3.tgz",
++      "integrity": "sha512-qsjeeq5YjBZ5eMdFuUa4ZosMLxgr5RZ+F+Y1OrDhuOCEInRMA3x74XdBtggJcj9kOeInz0WE+LgCPDkZFlBYJw==",
++      "license": "MIT",
++      "optional": true,
++      "engines": {
++        "node": ">=12.0.0"
++      }
++    },
+     "node_modules/tailwind-merge": {
+       "version": "3.4.0",
+       "resolved": "https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.4.0.tgz",
+@@ -7737,6 +7980,15 @@
+         "url": "https://opencollective.com/webpack"
+       }
+     },
++    "node_modules/text-segmentation": {
++      "version": "1.0.3",
++      "resolved": "https://registry.npmjs.org/text-segmentation/-/text-segmentation-1.0.3.tgz",
++      "integrity": "sha512-iOiPUo/BGnZ6+54OsWxZidGCsdU8YbE4PSpdPinp7DeMtUJNJBoJ/ouUSTJjHkh1KntHaltHl/gDs2FC4i5+Nw==",
++      "license": "MIT",
++      "dependencies": {
++        "utrie": "^1.0.2"
++      }
++    },
+     "node_modules/three": {
+       "version": "0.182.0",
+       "resolved": "https://registry.npmjs.org/three/-/three-0.182.0.tgz",
+@@ -8050,6 +8302,15 @@
+         "node": ">= 4"
+       }
+     },
++    "node_modules/utrie": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/utrie/-/utrie-1.0.2.tgz",
++      "integrity": "sha512-1MLa5ouZiOmQzUbjbu9VmjLzn1QLXBhwpUa7kdLUQK+KQ5KA9I1vk5U4YHe/X2Ch7PYnJfWuWT+VbuxbGwljhw==",
++      "license": "MIT",
++      "dependencies": {
++        "base64-arraybuffer": "^1.0.2"
++      }
++    },
+     "node_modules/vaul": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/vaul/-/vaul-1.1.2.tgz",
+@@ -8186,6 +8447,24 @@
+         "node": ">= 8"
+       }
+     },
++    "node_modules/wmf": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/wmf/-/wmf-1.0.2.tgz",
++      "integrity": "sha512-/p9K7bEh0Dj6WbXg4JG0xvLQmIadrner1bi45VMJTfnbVHsc7yIajZyoSoK60/dtVBs12Fm6WkUI5/3WAVsNMw==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
++    "node_modules/word": {
++      "version": "0.3.0",
++      "resolved": "https://registry.npmjs.org/word/-/word-0.3.0.tgz",
++      "integrity": "sha512-OELeY0Q61OXpdUfTp+oweA/vtLVg5VDOXh+3he3PNzLGG/y0oylSOC1xRVj0+l4vQ3tj/bB1HVHv1ocXkQceFA==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/word-wrap": {
+       "version": "1.2.5",
+       "resolved": "https://registry.npmjs.org/word-wrap/-/word-wrap-1.2.5.tgz",
+@@ -8202,6 +8481,27 @@
+       "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==",
+       "license": "ISC"
+     },
++    "node_modules/xlsx": {
++      "version": "0.18.5",
++      "resolved": "https://registry.npmjs.org/xlsx/-/xlsx-0.18.5.tgz",
++      "integrity": "sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "adler-32": "~1.3.0",
++        "cfb": "~1.2.1",
++        "codepage": "~1.15.0",
++        "crc-32": "~1.2.1",
++        "ssf": "~0.11.2",
++        "wmf": "~1.0.1",
++        "word": "~0.3.0"
++      },
++      "bin": {
++        "xlsx": "bin/xlsx.njs"
++      },
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/yallist": {
+       "version": "3.1.1",
+       "resolved": "https://registry.npmjs.org/yallist/-/yallist-3.1.1.tgz",
+diff --git a/Frontend/CricLively/package.json b/Frontend/CricLively/package.json
+index 6902ecf..0ed056c 100644
+--- a/Frontend/CricLively/package.json
++++ b/Frontend/CricLively/package.json
+@@ -47,7 +47,9 @@
+     "cmdk": "^1.1.1",
+     "embla-carousel-react": "^8.6.0",
+     "framer-motion": "^12.26.2",
++    "html2canvas": "^1.4.1",
+     "input-otp": "^1.4.2",
++    "jspdf": "^2.5.2",
+     "lucide-react": "^0.562.0",
+     "next-themes": "^0.4.6",
+     "radix-ui": "^1.4.3",
+@@ -64,6 +66,7 @@
+     "tailwind-merge": "^3.4.0",
+     "three": "^0.182.0",
+     "vaul": "^1.1.2",
++    "xlsx": "^0.18.5",
+     "zustand": "^5.0.10"
+   },
+   "devDependencies": {
+diff --git a/Frontend/CricLively/src/App.tsx b/Frontend/CricLively/src/App.tsx
+index 11b647c..241ff43 100644
+--- a/Frontend/CricLively/src/App.tsx
++++ b/Frontend/CricLively/src/App.tsx
+@@ -9,6 +9,7 @@ import Login from "./components/Login";
+ import Registration from "./components/Registration";
+ import Matches from "./components/Matches";
+ import Stats from "./components/Stats";
++import TeamGeneration from "./components/TeamGeneration";
+ import PlayerCricketDetails from "./components/PlayerCricketDetails";
+ import DashboardTournament from "./components/DashboardTournament";
+ import CreateTeam from "./components/CreateTeam";
+@@ -68,6 +69,7 @@ const App = () => (
+             {/* SCOREBOARD: every logged-in person */}
+             <Route path="/viewer/:matchId" element={<ViewerPage />} />
+             <Route path="/stats" element={<Stats />} />
++            <Route path="/team-generation" element={<TeamGeneration />} />
+             <Route path="/profile" element={<ProfilePage />} />
+             <Route path="/profile/edit" element={<ProfileEditForm mode="self" />} />
+             <Route path="/player/:playerId" element={<PlayerCricketDetails />} />
+diff --git a/Frontend/CricLively/src/components/Footer.tsx b/Frontend/CricLively/src/components/Footer.tsx
+index b781526..0aa0b27 100644
+--- a/Frontend/CricLively/src/components/Footer.tsx
++++ b/Frontend/CricLively/src/components/Footer.tsx
+@@ -12,13 +12,6 @@ export default function Footer() {
+             CricLively
+           </motion.div>
+           
+-          <div className="flex items-center gap-10">
+-            <a href="#" className="text-foreground/70 hover:text-foreground transition-colors">Home</a>
+-            <a href="#matches" className="text-foreground/70 hover:text-foreground transition-colors">Matches</a>
+-            <a href="#teams" className="text-foreground/70 hover:text-foreground transition-colors">Teams</a>
+-            <a href="#stats" className="text-foreground/70 hover:text-foreground transition-colors">Stats</a>
+-          </div>
+-          
+           <div className="flex items-center gap-4">
+             <motion.a 
+               href="#" 
+diff --git a/Frontend/CricLively/src/components/TeamGeneration.tsx b/Frontend/CricLively/src/components/TeamGeneration.tsx
+new file mode 100644
+index 0000000..9a3801a
+--- /dev/null
++++ b/Frontend/CricLively/src/components/TeamGeneration.tsx
+@@ -0,0 +1,210 @@
++import { useRef, useState } from "react";
++import { motion } from "framer-motion";
++import * as XLSX from "xlsx";
++import Navbar from "./Navbar";
++import { toast } from "../hooks/use-toast";
++import {
++  CATEGORY_INFO,
++  exportExcel,
++  generateTeams,
++  type Category,
++  type GeneratedTeams,
++} from "../lib/teamGeneration";
++
++const CATEGORIES: Category[] = ["men", "women", "boys", "girls"];
++const EMPTY: GeneratedTeams = { men: [], women: [], boys: [], girls: [] };
++
++// Upload an Excel file (sheets MEN, WOMEN, Boys, Girls with the columns FullName and Age),
++// pick the categories and team sizes, and generate teams. Everything happens in the browser.
++export default function TeamGeneration() {
++  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
++  const [fileName, setFileName] = useState("");
++  const [selected, setSelected] = useState<Record<Category, boolean>>({ men: false, women: false, boys: false, girls: false });
++  const [sizes, setSizes] = useState<Record<Category, number>>({ men: 7, women: 7, boys: 7, girls: 7 });
++  const [teams, setTeams] = useState<GeneratedTeams>(EMPTY);
++  const outputRef = useRef<HTMLDivElement>(null);
++
++  const chosen = CATEGORIES.filter((c) => selected[c]);
++  const hasOutput = chosen.some((c) => teams[c].length > 0);
++
++  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
++    const file = e.target.files?.[0];
++    if (!file) return;
++    const reader = new FileReader();
++    reader.onload = (ev) => {
++      try {
++        setWorkbook(XLSX.read(ev.target?.result as ArrayBuffer, { type: "array" }));
++        setFileName(file.name);
++        setTeams(EMPTY);
++      } catch {
++        toast({ title: "Could not read the file", description: "Upload an Excel file (.xlsx).", variant: "destructive" });
++      }
++    };
++    reader.readAsArrayBuffer(file);
++  };
++
++  const generate = () => {
++    if (!workbook) {
++      toast({ title: "No file loaded", description: "Upload the Excel file first.", variant: "destructive" });
++      return;
++    }
++    if (chosen.length === 0) {
++      toast({ title: "Pick a category", description: "Select at least one of Men, Women, Boys, Girls.", variant: "destructive" });
++      return;
++    }
++    if (chosen.some((c) => !Number.isInteger(sizes[c]) || sizes[c] < 1)) {
++      toast({ title: "Team size must be 1 or more", variant: "destructive" });
++      return;
++    }
++    try {
++      const result = generateTeams({ workbook, sizes });
++      setTeams(result);
++      const empty = chosen.filter((c) => result[c].length === 0).map((c) => CATEGORY_INFO[c].sheet);
++      if (empty.length > 0) {
++        toast({
++          title: "No players found",
++          description: `Check the sheet ${empty.join(", ")} (columns FullName and Age).`,
++          variant: "destructive",
++        });
++      }
++    } catch (e) {
++      toast({ title: "Could not generate teams", description: (e as Error).message, variant: "destructive" });
++    }
++  };
++
++  const pdf = async () => {
++    if (!outputRef.current || !hasOutput) {
++      toast({ title: "Nothing to export", description: "Generate the teams first.", variant: "destructive" });
++      return;
++    }
++    try {
++      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
++      const canvas = await html2canvas(outputRef.current, { scale: 2, backgroundColor: "#ffffff" });
++      const w = canvas.width / 2;
++      const h = canvas.height / 2;
++      const doc = new jsPDF({ orientation: w > h ? "landscape" : "portrait", unit: "px", format: [w, h] });
++      doc.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h);
++      doc.save("Generated_Teams.pdf");
++    } catch {
++      toast({ title: "Could not create the PDF", variant: "destructive" });
++    }
++  };
++
++  const excel = () => {
++    if (!exportExcel(teams, chosen)) {
++      toast({ title: "Nothing to export", description: "Generate the teams first.", variant: "destructive" });
++    }
++  };
++
++  return (
++    <>
++      <Navbar />
++      <section className="min-h-[100vh] pt-28 pb-12 px-4 flex flex-col items-center">
++        <motion.h1
++          className="text-4xl md:text-5xl font-extrabold text-foreground mb-8"
++          initial={{ opacity: 0, y: -20 }}
++          animate={{ opacity: 1, y: 0 }}
++        >
++          Create the Team
++        </motion.h1>
++
++        <motion.div
++          initial={{ opacity: 0, y: 30 }}
++          animate={{ opacity: 1, y: 0 }}
++          className="w-full max-w-md bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl space-y-5"
++        >
++          <div>
++            <label className="block text-sm font-semibold text-foreground mb-1">Upload file</label>
++            <input type="file" accept=".xlsx,.xls" onChange={onFile} className="text-sm text-foreground" />
++            {fileName && <p className="text-xs text-foreground/60 mt-1">{fileName}</p>}
++            <p className="text-xs text-foreground/60 mt-2">
++              Sheets: MEN, WOMEN, Boys, Girls. Columns: FullName, Age.
++            </p>
++          </div>
++
++          <div>
++            <p className="text-sm font-semibold text-foreground mb-2">Categories</p>
++            <div className="flex flex-wrap gap-4">
++              {CATEGORIES.map((c) => (
++                <label key={c} className="flex items-center gap-2 text-sm text-foreground">
++                  <input
++                    type="checkbox"
++                    checked={selected[c]}
++                    onChange={(e) => setSelected({ ...selected, [c]: e.target.checked })}
++                    className="accent-red-600"
++                  />
++                  {CATEGORY_INFO[c].label}
++                </label>
++              ))}
++            </div>
++          </div>
++
++          {chosen.length > 0 && (
++            <div className="space-y-3">
++              {chosen.map((c) => (
++                <div key={c} className="flex items-center justify-between gap-3">
++                  <label className="text-sm text-foreground">Team size ({CATEGORY_INFO[c].label})</label>
++                  <input
++                    type="number"
++                    min={1}
++                    value={sizes[c]}
++                    onChange={(e) => setSizes({ ...sizes, [c]: Number(e.target.value) })}
++                    className="w-24 px-3 py-2 rounded-xl bg-background/70 border border-border text-sm"
++                  />
++                </div>
++              ))}
++            </div>
++          )}
++
++          <div className="flex flex-wrap gap-2">
++            <button onClick={generate} className="flex-1 py-2.5 rounded-full bg-red-600 text-white text-sm font-semibold">
++              Generate Teams
++            </button>
++            <button onClick={pdf} className="flex-1 py-2.5 rounded-full border-2 border-red-600 text-red-600 text-sm font-semibold">
++              Export PDF
++            </button>
++            <button onClick={excel} className="flex-1 py-2.5 rounded-full border-2 border-red-600 text-red-600 text-sm font-semibold">
++              Export Excel
++            </button>
++          </div>
++        </motion.div>
++
++        {hasOutput && (
++          <div ref={outputRef} className="w-full max-w-6xl mt-10 p-4 bg-white rounded-3xl text-black">
++            {chosen.map(
++              (c) =>
++                teams[c].length > 0 && (
++                  <div key={c} className="mb-6 last:mb-0">
++                    <p className="text-xl font-bold mb-3">{CATEGORY_INFO[c].label}</p>
++                    <div className="flex flex-wrap gap-4">
++                      {teams[c].map((team, i) => (
++                        <table key={i} className="min-w-[180px] border border-black/20 text-sm">
++                          <thead>
++                            <tr>
++                              <th className="bg-red-600 text-white px-3 py-2 text-left">
++                                {CATEGORY_INFO[c].teamNames[i] || `Team-${i + 1}`}
++                              </th>
++                            </tr>
++                          </thead>
++                          <tbody>
++                            {team.map((player, p) => (
++                              <tr key={p} className="border-t border-black/10">
++                                <td className="px-3 py-1.5">
++                                  {c === "men" && p === 0 && <b className="text-red-600">CAPTAIN: </b>}
++                                  {player}
++                                </td>
++                              </tr>
++                            ))}
++                          </tbody>
++                        </table>
++                      ))}
++                    </div>
++                  </div>
++                )
++            )}
++          </div>
++        )}
++      </section>
++    </>
++  );
++}
+diff --git a/Frontend/CricLively/src/components/TeamGenerationSection.tsx b/Frontend/CricLively/src/components/TeamGenerationSection.tsx
+new file mode 100644
+index 0000000..c516d69
+--- /dev/null
++++ b/Frontend/CricLively/src/components/TeamGenerationSection.tsx
+@@ -0,0 +1,31 @@
++import { motion } from "framer-motion";
++import { useNavigate } from "react-router-dom";
++
++// Home page: the section under the hero.
++export default function TeamGenerationSection() {
++  const navigate = useNavigate();
++  return (
++    <section className="py-20 px-6">
++      <motion.div
++        initial={{ opacity: 0, y: 30 }}
++        whileInView={{ opacity: 1, y: 0 }}
++        viewport={{ once: true }}
++        transition={{ duration: 0.6 }}
++        className="container mx-auto max-w-3xl bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl text-center"
++      >
++        <h2 className="text-3xl md:text-4xl font-extrabold text-foreground mb-3">Team Generation</h2>
++        <p className="text-foreground/70 mb-6">
++          Upload your players list and create balanced teams in seconds. Export them as PDF or Excel.
++        </p>
++        <motion.button
++          whileHover={{ scale: 1.05 }}
++          whileTap={{ scale: 0.95 }}
++          onClick={() => navigate("/team-generation")}
++          className="px-8 py-3 bg-red-600 text-white rounded-full font-semibold shadow-lg"
++        >
++          Team Generation
++        </motion.button>
++      </motion.div>
++    </section>
++  );
++}
+diff --git a/Frontend/CricLively/src/lib/teamGeneration.ts b/Frontend/CricLively/src/lib/teamGeneration.ts
+new file mode 100644
+index 0000000..b0381da
+--- /dev/null
++++ b/Frontend/CricLively/src/lib/teamGeneration.ts
+@@ -0,0 +1,161 @@
++// Team generation, copied from the JPL project (logic kept the same on purpose).
++import * as XLSX from "xlsx";
++
++export interface SheetPlayer {
++  name: string;
++  age: number;
++}
++
++// Players who are spread across teams first (one per team, round robin)
++export const MVPMenList: string[] = [
++  "Krushnadev Hipparkar", "Suraj More", "Pravin Deshmukh", "Rahul Kedar", "Kamlesh Patil", "Dnyanesh Raut",
++  "Sunil Kumar Roy", "Rahul Shetti", "Mukund Thonge", "Shrikanth Dhatrak", "Pradip Gorle", "Jeevan Ghorpade",
++];
++
++export const MensTeamNames = ["Doremon", "Nobita", "Tom", "Jerry", "Raichu", "Pikachu", "Motu", "Patlu", "Shinchan", "SpongeBob SquarePants"];
++export const WomensTeamNames = ["Wonder Woman", "Captian Marvel", "Mantis", "Moondragon"];
++export const BoysTeamNames = ["Captian America", "Iron Man", "The Hulk", "Spider Man", "Batman", "Thor", "Loki", "Black Panther", "Hawkeye", "Vision"];
++export const GirlsTeamNames = ["Cinderella", "Snow White", "Tom", "Jerry", "Moana", "Minnie Mouse"];
++
++export type Category = "men" | "women" | "boys" | "girls";
++
++export const CATEGORY_INFO: Record<Category, { label: string; sheet: string; teamNames: string[] }> = {
++  men: { label: "Men", sheet: "MEN", teamNames: MensTeamNames },
++  women: { label: "Women", sheet: "WOMEN", teamNames: WomensTeamNames },
++  boys: { label: "Boys", sheet: "Boys", teamNames: BoysTeamNames },
++  girls: { label: "Girls", sheet: "Girls", teamNames: GirlsTeamNames },
++};
++
++/** Reads one sheet: needs the columns "FullName" and "Age". Keeps first + last name only. */
++export function extractNamesAndAges(workbook: XLSX.WorkBook, sheetName: string): SheetPlayer[] {
++  const sheet = workbook.Sheets[sheetName];
++  if (!sheet) return []; // a missing sheet = nobody in that category (the page tells the person)
++
++  const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
++  if (!rows.length) return [];
++  const fullNameIndex = rows[0].indexOf("FullName");
++  const ageIndex = rows[0].indexOf("Age");
++  if (fullNameIndex < 0 || ageIndex < 0) {
++    throw new Error(`Sheet "${sheetName}" needs the columns FullName and Age`);
++  }
++
++  const players: SheetPlayer[] = [];
++  for (let i = 1; i < rows.length; i++) {
++    const rawName = rows[i][fullNameIndex];
++    const age = rows[i][ageIndex];
++    if (rawName && age) {
++      const parts = String(rawName).split(" ").filter(Boolean);
++      const name = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : String(rawName);
++      players.push({ name, age: Number(age) });
++    }
++  }
++  return players;
++}
++
++export function shuffleArray(arr: string[]): void {
++  for (let i = arr.length - 1; i > 0; i--) {
++    const j = Math.floor(Math.random() * (i + 1));
++    [arr[i], arr[j]] = [arr[j], arr[i]];
++  }
++}
++
++export function splitIntoTeams(players: string[], teamSize: number): string[][] {
++  const teams: string[][] = [];
++  for (let i = 0; i < players.length; i += teamSize) {
++    teams.push(players.slice(i, i + teamSize));
++  }
++  return teams;
++}
++
++function initializeEmptyTeams(total: number): string[][] {
++  return Array.from({ length: total }, () => []);
++}
++
++function distributeMVPPlayers(teams: string[][], special: string[]): void {
++  if (!teams.length) return;
++  let teamIndex = 0;
++  special.forEach((player) => {
++    teams[teamIndex].push(player);
++    teamIndex = (teamIndex + 1) % teams.length;
++  });
++}
++
++function fillTeams(teams: string[][], remaining: string[], teamSize: number): string[][] {
++  for (const player of remaining) {
++    for (const team of teams) {
++      if (team.length < teamSize) {
++        team.push(player);
++        break;
++      }
++    }
++  }
++  return teams;
++}
++
++export interface GenerateInput {
++  workbook: XLSX.WorkBook;
++  sizes: Record<Category, number>;
++}
++
++export type GeneratedTeams = Record<Category, string[][]>;
++
++export function generateTeams({ workbook, sizes }: GenerateInput): GeneratedTeams {
++  const men = extractNamesAndAges(workbook, CATEGORY_INFO.men.sheet);
++  const women = extractNamesAndAges(workbook, CATEGORY_INFO.women.sheet);
++  const boys = extractNamesAndAges(workbook, CATEGORY_INFO.boys.sheet);
++  const girls = extractNamesAndAges(workbook, CATEGORY_INFO.girls.sheet);
++
++  // Men: age 13 and above; the special (MVP) players are spread first, then the rest fill the teams
++  const menNames = men.filter((p) => p.age >= 13).map((p) => p.name);
++  const mvp = menNames.filter((n) => MVPMenList.includes(n));
++  const others = menNames.filter((n) => !MVPMenList.includes(n));
++  shuffleArray(mvp);
++  shuffleArray(others);
++
++  const totalTeams = Math.ceil(menNames.length / sizes.men);
++  const menTeams = initializeEmptyTeams(totalTeams);
++  distributeMVPPlayers(menTeams, mvp);
++
++  return {
++    men: fillTeams(menTeams, others, sizes.men),
++    women: splitIntoTeams(women.map((p) => p.name), sizes.women),
++    boys: splitIntoTeams(boys.map((p) => p.name), sizes.boys),
++    girls: splitIntoTeams(girls.map((p) => p.name), sizes.girls),
++  };
++}
++
++/** Excel layout: team names across the top, players underneath, one blank column between teams. */
++export function sheetRows(teams: string[][], teamNames: string[]): string[][] {
++  const rows: string[][] = [];
++  const header: string[] = [];
++  teams.forEach((_, i) => {
++    header.push(teamNames[i] || `Team-${i + 1}`);
++    if (i < teams.length - 1) header.push("");
++  });
++  rows.push(header);
++
++  const maxPlayers = Math.max(0, ...teams.map((t) => t.length));
++  for (let i = 0; i < maxPlayers; i++) {
++    const row: string[] = [];
++    teams.forEach((team, idx) => {
++      row.push(team[i] || "");
++      if (idx < teams.length - 1) row.push("");
++    });
++    rows.push(row);
++  }
++  return rows;
++}
++
++export function exportExcel(teams: GeneratedTeams, selected: Category[]): boolean {
++  const wb = XLSX.utils.book_new();
++  let any = false;
++  for (const c of selected) {
++    if (teams[c].length > 0) {
++      const sheet = XLSX.utils.aoa_to_sheet(sheetRows(teams[c], CATEGORY_INFO[c].teamNames));
++      XLSX.utils.book_append_sheet(wb, sheet, `${CATEGORY_INFO[c].label} Teams`);
++      any = true;
++    }
++  }
++  if (any) XLSX.writeFile(wb, "Generated_Teams_Excel.xlsx");
++  return any;
++}
+diff --git a/Frontend/CricLively/src/pages/Index.tsx b/Frontend/CricLively/src/pages/Index.tsx
+index 9d8d585..9aab1fe 100644
+--- a/Frontend/CricLively/src/pages/Index.tsx
++++ b/Frontend/CricLively/src/pages/Index.tsx
+@@ -1,5 +1,6 @@
+ import Navbar from '../components/Navbar';
+ import HeroSection from '../components/HeroSection';
++import TeamGenerationSection from '../components/TeamGenerationSection';
+ import Footer from '../components/Footer';
+ 
+ const Index = () => {
+@@ -7,6 +8,7 @@ const Index = () => {
+     <div className="min-h-screen bg-background overflow-x-hidden">
+       <Navbar />
+       <HeroSection />
++      <TeamGenerationSection />
+       <Footer />
+     </div>
+   );
