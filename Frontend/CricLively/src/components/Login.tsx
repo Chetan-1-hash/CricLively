@@ -8,8 +8,7 @@ import { saveSession } from "../lib/auth";
 import { toast } from "../hooks/use-toast";
 import { useState } from "react";
 
-const inputCls =
-  "w-full px-3.5 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow";
+const inputCls = "input-glass";
 
 // One login for everybody - players, organizers and admins.
 // The server tells us the person's roles and the app shows the right things.
@@ -78,11 +77,11 @@ export default function Login() {
           initial={{ opacity: 0, y: 30, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.6 }}
-          className="relative z-10 w-full max-w-md bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/10"
+          className="card-glass relative z-10 w-full max-w-md rounded-3xl p-6"
         >
           {/* Header */}
           <div className="text-center mb-6">
-            <span className="inline-block px-3 py-1.5 bg-primary/20 rounded-full text-xs font-medium text-foreground mb-3">
+            <span className="badge-glass text-xs mb-3 inline-block">
               🏏 Welcome Back
             </span>
             <h1 className="text-2xl font-extrabold text-foreground">Login to CricLively</h1>
@@ -134,7 +133,7 @@ export default function Login() {
               disabled={loading}
               whileHover={{ scale: loading ? 1 : 1.03 }}
               whileTap={{ scale: loading ? 1 : 0.97 }}
-              className="w-full py-3 bg-primary text-primary-foreground rounded-full font-semibold text-base shadow-lg hover:shadow-xl transition-shadow disabled:opacity-70 flex items-center justify-center gap-2"
+              className="btn-primary-glass"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
               {loading ? "Signing in..." : "Login"}
@@ -151,7 +150,7 @@ export default function Login() {
             type="button"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            className="w-full py-2.5 border-2 border-foreground/30 rounded-full font-semibold text-sm text-foreground backdrop-blur-sm hover:bg-foreground/10 transition-colors"
+            className="btn-ghost-glass"
           >
             Continue with Google
           </motion.button>

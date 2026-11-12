@@ -75,12 +75,14 @@ export default function Navbar() {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="fixed top-0 left-0 right-0 z-50 py-3 bg-background/70 backdrop-blur-sm shadow-sm"
+      className="fixed top-0 left-0 right-0 z-50 py-3 backdrop-blur-xl shadow-sm"
+      style={{ background: 'rgba(20,60,5,0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-4">
         {/* Logo */}
         <motion.div
-          className="text-2xl md:text-3xl font-bold bg-secondary/60 rounded-full px-4 py-1 text-foreground cursor-pointer"
+          className="text-2xl md:text-3xl font-bold rounded-full px-4 py-1 text-foreground cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', fontFamily: "'Syne', sans-serif" }}
           whileHover={{ scale: 1.05 }}
           onClick={() => navigate("/")}
         >
@@ -88,7 +90,8 @@ export default function Navbar() {
         </motion.div>
 
         {/* Navigation */}
-        <div className="hidden md:flex items-center gap-2 bg-secondary/60 rounded-full px-2 py-1">
+        <div className="hidden md:flex items-center gap-2 rounded-full px-2 py-1"
+          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
           {navItems.map((item) => (
             <NavLink
               key={item.to}

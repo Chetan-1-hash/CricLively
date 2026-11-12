@@ -93,11 +93,11 @@ export default function Registration() {
           initial={{ opacity: 0, y: 30, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.6 }}
-          className="relative z-10 w-full max-w-md bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl"
+          className="card-glass relative z-10 w-full max-w-md rounded-3xl p-6"
         >
           {/* Header */}
           <div className="text-center mb-6">
-            <span className="inline-block px-3 py-1.5 bg-primary/20 rounded-full text-xs font-medium text-foreground mb-3">
+            <span className="badge-glass text-xs mb-3 inline-block">
               🏏 Join CricLively
             </span>
             <h1 className="text-2xl font-extrabold text-foreground">
@@ -112,85 +112,44 @@ export default function Registration() {
           <form className="space-y-4">
             {/* Full Name */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Full Name
-              </label>
-              <input
-                type="text"
-                placeholder="Your Name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="block text-xs font-medium text-foreground mb-1.5">Full Name</label>
+              <input type="text" placeholder="Your Name" value={fullName}
+                onChange={(e) => setFullName(e.target.value)} className="input-glass" />
             </div>
 
             {/* Date of Birth */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="block text-xs font-medium text-foreground mb-1.5">Date of Birth</label>
+              <input type="date" value={dob}
+                onChange={(e) => setDob(e.target.value)} className="input-glass" />
             </div>
 
             {/* Mobile Number */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Mobile Number
-              </label>
-              <input
-                type="tel"
-                placeholder="1234567890"
-                value={mobileNumber}
-                onChange={(e) => setMobileNumber(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="block text-xs font-medium text-foreground mb-1.5">Mobile Number</label>
+              <input type="tel" placeholder="1234567890" value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)} className="input-glass" />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Email Address
-              </label>
-              <input
-                type="email"
-                placeholder="you@cricket.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="block text-xs font-medium text-foreground mb-1.5">Email Address</label>
+              <input type="email" placeholder="you@cricket.com" value={email}
+                onChange={(e) => setEmail(e.target.value)} className="input-glass" />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Password
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="block text-xs font-medium text-foreground mb-1.5">Password</label>
+              <input type="password" placeholder="••••••••" value={password}
+                onChange={(e) => setPassword(e.target.value)} className="input-glass" />
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground placeholder:text-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="block text-xs font-medium text-foreground mb-1.5">Confirm Password</label>
+              <input type="password" placeholder="••••••••" value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)} className="input-glass" />
             </div>
 
             {/* Register Button */}
@@ -199,7 +158,7 @@ export default function Registration() {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               onClick={handleRegister}
-              className="w-full py-3 bg-primary text-primary-foreground rounded-full font-semibold text-base shadow-lg hover:shadow-xl transition-shadow"
+              className="btn-primary-glass"
             >
               Register
             </motion.button>
@@ -216,7 +175,7 @@ export default function Registration() {
           <motion.button
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
-            className="w-full py-2.5 border-2 border-foreground/30 rounded-full font-semibold text-sm text-foreground backdrop-blur-sm hover:bg-foreground/10 transition-colors"
+            className="btn-ghost-glass"
           >
             Continue with Google
           </motion.button>
