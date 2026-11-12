@@ -190,6 +190,8 @@ public class ScoringService {
             throw new IllegalArgumentException("Runs are out of range");
         }
 
+        checkFielders(match, innings, ball);
+
         ball.setId(null);                 // always a NEW record
         ball.setMatchId(matchId);         // the match always comes from the URL
         ball.setSeq(ballRepository.countByMatchIdAndInningsNo(matchId, no) + 1);
@@ -197,6 +199,39 @@ public class ScoringService {
 
         refreshSummary(match, no);
         return saved;
+    }
+
+    /** Catch / stumping / run-out: who did it must be a player of the bowling team. */
+    private void checkFielders(Match match, Innings innings, BallByBall ball) {
+        Wicket w = ball.getWicket();
+        if (w == null) return;
+        List<String> fieldingXi = Objects.equals(innings.getBowlingTeamId(), match.getTeamAId())
+                ? match.getPlayingXiA() : match.getPlayingXiB();
+        Wicket.OutType type = w.getOutType();
+
+        boolean needsFielder = type == Wicket.OutType.CAUGHT || type == Wicket.OutType.STUMPED
+                || type == Wicket.OutType.RUNOUT;
+        if (needsFielder && isBlank(w.getFielderId())) {
+            throw new IllegalArgumentException("Pick the fielder for this dismissal (catch, stumping or run-out)");
+        }
+        if (!isBlank(w.getFielderId()) && (fieldingXi == null || !fieldingXi.contains(w.getFielderId()))) {
+            throw new IllegalArgumentException("The fielder must be from the bowling team's playing team");
+        }
+
+        List<String> assists = new ArrayList<>();
+        if (type == Wicket.OutType.RUNOUT && w.getAssistFielderIds() != null) {
+            for (String id : new LinkedHashSet<>(w.getAssistFielderIds())) {
+                if (isBlank(id) || id.equals(w.getFielderId())) continue;
+                if (fieldingXi == null || !fieldingXi.contains(id)) {
+                    throw new IllegalArgumentException("Everybody who helped in the run-out must be from the bowling team");
+                }
+                assists.add(id);
+            }
+        }
+        w.setAssistFielderIds(assists);
+        if (type != Wicket.OutType.CAUGHT && type != Wicket.OutType.STUMPED && type != Wicket.OutType.RUNOUT) {
+            w.setFielderId(null);
+        }
     }
 
     /** Remove the most recent ball of an innings and recompute the totals. */

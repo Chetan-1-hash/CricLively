@@ -44,6 +44,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
+          <Route path="/team-generation" element={<TeamGeneration />} />
 
           {/* ---------- Any logged-in person: player, organizer or admin ---------- */}
           <Route element={<RequireRole />}>
@@ -69,7 +70,6 @@ const App = () => (
             {/* SCOREBOARD: every logged-in person */}
             <Route path="/viewer/:matchId" element={<ViewerPage />} />
             <Route path="/stats" element={<Stats />} />
-            <Route path="/team-generation" element={<TeamGeneration />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<ProfileEditForm mode="self" />} />
             <Route path="/player/:playerId" element={<PlayerCricketDetails />} />

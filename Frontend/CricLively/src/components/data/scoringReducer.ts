@@ -21,6 +21,10 @@ export type ScoringAction =
         isWicket: boolean;
         wicketType?: WicketType;
         outPlayerId?: string;
+        fielderId?: string;
+        fielderName?: string;
+        assistIds?: string[];
+        assistNames?: string[];
         newBatsmanId?: string; // required if isWicket and innings continues
         newBatsmanName?: string;
       };
@@ -97,11 +101,18 @@ function applyBallToInnings(
       outBatsman.isOnStrike = false;
       outBatsman.dismissal =
         ball.wicketType === "Caught"
-          ? `c & b ${bowler?.name ?? ""}`.trim()
+          ? (!ball.fielderId || ball.fielderId === ball.bowlerId
+              ? `c & b ${bowler?.name ?? ""}`
+              : `c ${ball.fielderName ?? ""} b ${bowler?.name ?? ""}`
+            ).trim()
+          : ball.wicketType === "Stumped"
+          ? `st ${ball.fielderName ?? ""} b ${bowler?.name ?? ""}`.replace("  ", " ").trim()
           : ball.wicketType === "Bowled"
           ? `b ${bowler?.name ?? ""}`
           : ball.wicketType === "Run Out"
-          ? "run out"
+          ? ball.fielderName
+            ? `run out (${[ball.fielderName, ...(ball.assistNames ?? [])].join(" / ")})`
+            : "run out"
           : ball.wicketType ?? "out";
     }
   }
@@ -143,8 +154,10 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
 
   switch (action.type) {
     case "RECORD_BALL": {
-      const { runs, extraType, extraRuns, isWicket, wicketType, outPlayerId, newBatsmanId, newBatsmanName } =
-        action.payload;
+      const {
+        runs, extraType, extraRuns, isWicket, wicketType, outPlayerId, newBatsmanId, newBatsmanName,
+        fielderId, fielderName, assistIds, assistNames,
+      } = action.payload;
       const legal = isLegalDelivery(extraType);
 
       const updatedInnings = applyBallToInnings(currentInnings, {
@@ -154,6 +167,10 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
         isWicket,
         wicketType,
         outPlayerId,
+        fielderId,
+        fielderName,
+        assistIds,
+        assistNames,
         strikerId: currentInnings.strikerId,
         nonStrikerId: currentInnings.nonStrikerId,
         bowlerId: currentInnings.currentBowlerId,
@@ -171,6 +188,10 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
         isWicket,
         wicketType,
         outPlayerId,
+        fielderId,
+        fielderName,
+        assistIds,
+        assistNames,
         strikerId: currentInnings.strikerId,
         nonStrikerId: currentInnings.nonStrikerId,
         bowlerId: currentInnings.currentBowlerId,

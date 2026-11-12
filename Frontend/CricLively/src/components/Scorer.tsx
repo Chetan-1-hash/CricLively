@@ -18,6 +18,7 @@ import Navbar from "./Navbar";
 import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
 import LineupPanel from "./LineupPanel";
 import { useLiveUpdates } from "../lib/useLiveUpdates";
+import { describeResult } from "../lib/matchResult";
 import ScorerAccessDialog from "./ScorerAccessDialog";
 
 const WICKET_TYPES: WicketType[] = ["Bowled", "Caught", "LBW", "Run Out", "Stumped", "Hit Wicket", "Retired Hurt"];
@@ -91,6 +92,9 @@ export default function Scorer() {
   const [showNewBatsmanPicker, setShowNewBatsmanPicker] = useState(false);
   const [pendingOutPlayerId, setPendingOutPlayerId] = useState<string | null>(null);
   const [showBowlerPicker, setShowBowlerPicker] = useState(false);
+  const [startedSecond, setStartedSecond] = useState(false); // the scorer agreed to start the 2nd innings
+  const [fielderId, setFielderId] = useState(""); // caught by / stumped by / run out by
+  const [assistIds, setAssistIds] = useState<string[]>([]); // run-out helpers (several allowed)
 
   const load = useCallback(async () => {
     if (!matchId) return;
@@ -132,6 +136,8 @@ export default function Scorer() {
     setIsWicket(false);
     setWicketType("Bowled");
     setPendingOutPlayerId(null);
+    setFielderId("");
+    setAssistIds([]);
   };
 
   const exit = () => navigate(-1);
@@ -213,8 +219,45 @@ export default function Scorer() {
   if (innings.isComplete) {
     if (state.currentInningsIndex === 0 && !sb.innings2) {
       return (
-        <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`1st innings over: ${innings.totalRuns}/${innings.totalWickets}`} onExit={exit}>
-          <InningsSetupPanel sb={sb} inningsNo={2} onDone={load} />
+        <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle="1st innings completed" onExit={exit}>
+          {startedSecond ? (
+            <InningsSetupPanel sb={sb} inningsNo={2} onDone={load} />
+          ) : (
+            <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center space-y-4">
+              <p className="text-xs font-bold tracking-wide text-foreground/60">INNINGS 1 COMPLETED</p>
+              <p className="text-3xl font-extrabold text-foreground">
+                {innings.battingTeam} {innings.totalRuns}/{innings.totalWickets}
+              </p>
+              <p className="text-foreground/70">
+                in {innings.totalOvers}.{innings.ballsInCurrentOver} overs
+              </p>
+              <p className="rounded-xl bg-accent/20 px-4 py-3 text-sm font-semibold text-foreground">
+                {innings.bowlingTeam} need {innings.totalRuns + 1} runs from {state.maxOvers * 6} balls to win
+              </p>
+              <div className="flex gap-3 justify-center flex-wrap">
+                <button
+                  onClick={() => setStartedSecond(true)}
+                  className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
+                >
+                  Start 2nd innings
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!matchId) return;
+                    try {
+                      await undoLastBall(matchId, 1);
+                      await load();
+                    } catch (e) {
+                      toast({ title: "Could not undo", variant: "destructive", description: (e as Error).message });
+                    }
+                  }}
+                  className="px-6 py-2.5 bg-background/60 text-foreground rounded-full font-semibold"
+                >
+                  Undo last ball
+                </button>
+              </div>
+            </div>
+          )}
         </Shell>
       );
     }
@@ -225,6 +268,7 @@ export default function Scorer() {
             {innings.battingTeam}: {innings.totalRuns}/{innings.totalWickets} in {innings.totalOvers}.
             {innings.ballsInCurrentOver} overs
           </p>
+          {describeResult(state) && <p className="text-lg font-bold text-foreground">{describeResult(state)}</p>}
           <div className="flex gap-3 justify-center">
             <button
               onClick={async () => {
@@ -270,6 +314,11 @@ export default function Scorer() {
     .filter((id) => !innings.battingOrder.includes(id))
     .map((id) => ({ id, name: nameOf(id) }));
   const availableBowlers = bowlingSquad.map((id) => ({ id, name: nameOf(id) }));
+  // who can take a catch / stumping / run-out: the fielding team's playing XI
+  const fielders = bowlingSquad.map((id) => ({ id, name: nameOf(id) }));
+  const needsFielder = isWicket && (wicketType === "Caught" || wicketType === "Stumped" || wicketType === "Run Out");
+  const fielderLabel =
+    wicketType === "Caught" ? "Caught by" : wicketType === "Stumped" ? "Stumped by (wicketkeeper)" : "Run out by";
 
   // Save one ball on the server, then reload (the reload replays all balls)
   const submitBall = async (newBatsman?: { id: string; name: string }) => {
@@ -283,6 +332,10 @@ export default function Scorer() {
         isWicket,
         wicketType: isWicket ? wicketType : undefined,
         outPlayerId: isWicket ? pendingOutPlayerId ?? undefined : undefined,
+        fielderId: needsFielder ? fielderId : undefined,
+        fielderName: needsFielder && fielderId ? nameOf(fielderId) : undefined,
+        assistIds: needsFielder && wicketType === "Run Out" ? assistIds : undefined,
+        assistNames: needsFielder && wicketType === "Run Out" ? assistIds.map(nameOf) : undefined,
         newBatsmanId: newBatsman?.id,
         newBatsmanName: newBatsman?.name,
       },
@@ -308,6 +361,10 @@ export default function Scorer() {
   const handleConfirm = () => {
     if (isWicket && !pendingOutPlayerId) {
       toast({ title: "Select who's out", variant: "destructive", description: "Choose the dismissed batter first." });
+      return;
+    }
+    if (needsFielder && !fielderId) {
+      toast({ title: `Select who: ${fielderLabel}`, variant: "destructive", description: "The fielder is needed for the MVP points." });
       return;
     }
     // a wicket needs the next batsman first, and the ball is saved ONCE when he is picked
@@ -566,7 +623,11 @@ export default function Scorer() {
                   {WICKET_TYPES.map((wt) => (
                     <button
                       key={wt}
-                      onClick={() => setWicketType(wt)}
+                      onClick={() => {
+                        setWicketType(wt);
+                        setFielderId("");
+                        setAssistIds([]);
+                      }}
                       className={`py-2 rounded-xl text-xs font-semibold transition-colors ${
                         wicketType === wt ? "bg-accent text-accent-foreground" : "bg-background/60 text-foreground/80"
                       }`}
@@ -575,6 +636,53 @@ export default function Scorer() {
                     </button>
                   ))}
                 </div>
+
+                {needsFielder && (
+                  <div className="mt-4">
+                    <p className="text-sm text-foreground/70 mb-2">{fielderLabel}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {fielders.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setFielderId(p.id);
+                            setAssistIds((list) => list.filter((x) => x !== p.id));
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                            fielderId === p.id ? "bg-red-600 text-white" : "bg-background/60 text-foreground/80"
+                          }`}
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {wicketType === "Run Out" && (
+                      <>
+                        <p className="text-sm text-foreground/70 mt-4 mb-2">Also helped in the run-out (pick all who did)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {fielders
+                            .filter((p) => p.id !== fielderId)
+                            .map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() =>
+                                  setAssistIds((list) =>
+                                    list.includes(p.id) ? list.filter((x) => x !== p.id) : [...list, p.id]
+                                  )
+                                }
+                                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                                  assistIds.includes(p.id) ? "bg-accent text-accent-foreground" : "bg-background/60 text-foreground/80"
+                                }`}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

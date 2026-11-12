@@ -6,6 +6,8 @@ import com.CricLively.DTO.ExtendTournamentRequest;
 import com.CricLively.DTO.TournamentDashboardResponse;
 import com.CricLively.Entities.Tournament;
 import com.CricLively.Service.ImageStorageService;
+import com.CricLively.Service.LeaderboardService;
+import com.CricLively.Service.StandingsService;
 import com.CricLively.Service.TournamentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,8 @@ public class TournamentController {
 
     private final TournamentService tournamentService;
     private final ImageStorageService imageStorageService;
+    private final StandingsService standingsService;
+    private final LeaderboardService leaderboardService;
 
 
     @GetMapping
@@ -81,6 +85,30 @@ public class TournamentController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Team-wise points table: points, net run rate, form. Works out itself from the finished matches. */
+    @GetMapping("/{id}/points-table")
+    public ResponseEntity<?> pointsTable(@PathVariable String id, Authentication auth) {
+        try {
+            return ResponseEntity.ok(standingsService.pointsTable(id, auth));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Every player's batting, bowling, fielding and MVP numbers for this tournament. */
+    @GetMapping("/{id}/leaderboard")
+    public ResponseEntity<?> leaderboard(@PathVariable String id, Authentication auth) {
+        try {
+            return ResponseEntity.ok(leaderboardService.leaderboard(id, auth));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
         }
     }
 

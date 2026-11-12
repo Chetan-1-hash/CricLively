@@ -7,6 +7,8 @@ import { buildScoreState } from "../lib/scoreAdapter";
 import { useLiveUpdates } from "../lib/useLiveUpdates";
 import type { MatchScoreState } from "./data/MatchScoringTypes";
 import Navbar from "./Navbar";
+import { describeResult } from "../lib/matchResult";
+import type { InningsState } from "./data/MatchScoringTypes";
 
 export default function ViewerPage() {
   const navigate = useNavigate();
@@ -76,18 +78,10 @@ export default function ViewerPage() {
   }
 
   const innings = state.innings[state.currentInningsIndex];
-  const firstInnings = state.innings[0];
-  const secondInnings = state.innings[1];
-  let resultText: string | null = null;
-  if (state.status === "FINISHED" && secondInnings) {
-    if (secondInnings.totalRuns > firstInnings.totalRuns) {
-      resultText = `${secondInnings.battingTeam} won by ${Math.max((secondInnings.maxWickets ?? 10) - secondInnings.totalWickets, 0)} wickets`;
-    } else if (secondInnings.totalRuns < firstInnings.totalRuns) {
-      resultText = `${firstInnings.battingTeam} won by ${firstInnings.totalRuns - secondInnings.totalRuns} runs`;
-    } else {
-      resultText = "Match tied";
-    }
-  }
+  const resultText = describeResult(state);
+  const live = state.status === "LIVE";
+  // the chase banner only makes sense while the 2nd innings is still being played
+  const chasing = !!innings.target && !innings.isComplete && live;
   const overDisplay = `${innings.totalOvers}.${innings.ballsInCurrentOver}`;
   const striker = innings.batsmen[innings.strikerId];
   const nonStriker = innings.batsmen[innings.nonStrikerId];
@@ -99,12 +93,10 @@ export default function ViewerPage() {
     ? (innings.totalRuns / (innings.totalOvers + innings.ballsInCurrentOver / 6)).toFixed(2)
     : "0.00";
 
-  let requiredRunRate: string | null = null;
-  if (innings.target) {
-    const oversLeft = state.maxOvers - innings.totalOvers - innings.ballsInCurrentOver / 6;
-    const runsNeeded = innings.target - innings.totalRuns;
-    requiredRunRate = oversLeft > 0 ? (runsNeeded / oversLeft).toFixed(2) : "—";
-  }
+  const ballsLeft = Math.max(state.maxOvers * 6 - (innings.totalOvers * 6 + innings.ballsInCurrentOver), 0);
+  const runsNeeded = innings.target ? Math.max(innings.target - innings.totalRuns, 0) : 0;
+  const requiredRunRate: string | null =
+    chasing && ballsLeft > 0 ? (runsNeeded / (ballsLeft / 6)).toFixed(2) : null;
 
   return (
     <>
@@ -119,8 +111,12 @@ export default function ViewerPage() {
           transition={{ duration: 0.6 }}
         >
           <div>
-            <span className="inline-flex items-center gap-2 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span
+              className={`inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-2 ${
+                live ? "bg-red-600" : "bg-green-700"
+              }`}
+            >
+              {live && <span className="w-2 h-2 rounded-full bg-white animate-pulse" />}
               {state.status}
             </span>
             <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
@@ -164,14 +160,24 @@ export default function ViewerPage() {
             </div>
           )}
 
-          {innings.target && (
+          {chasing && (
             <div className="rounded-xl bg-accent/20 px-4 py-3 mb-4">
               <p className="text-sm font-semibold text-foreground">
-                Target: {innings.target} · Need {Math.max(innings.target - innings.totalRuns, 0)} runs
-                {state.maxOvers - innings.totalOvers > 0
-                  ? ` from ${Math.max((state.maxOvers - innings.totalOvers) * 6 - innings.ballsInCurrentOver, 0)} balls`
-                  : ""}
+                Target: {innings.target} · Need {runsNeeded} runs from {ballsLeft} balls
               </p>
+            </div>
+          )}
+
+          {state.innings.length === 2 && (
+            <div className="rounded-xl bg-background/60 px-4 py-3 mb-4 text-sm text-foreground space-y-1">
+              {state.innings.map((inn, i) => (
+                <div key={i} className="flex justify-between">
+                  <span className="font-semibold">{inn.battingTeam}</span>
+                  <span>
+                    {inn.totalRuns}/{inn.totalWickets} ({inn.totalOvers}.{inn.ballsInCurrentOver})
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -219,77 +225,9 @@ export default function ViewerPage() {
               transition={{ duration: 0.3 }}
               className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl"
             >
-              <h2 className="text-lg font-bold text-foreground mb-4">Batting — {innings.battingTeam}</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-foreground/50 text-left border-b border-foreground/10">
-                      <th className="py-2 pr-4 font-semibold">Batter</th>
-                      <th className="py-2 px-2 font-semibold text-right">R</th>
-                      <th className="py-2 px-2 font-semibold text-right">B</th>
-                      <th className="py-2 px-2 font-semibold text-right">4s</th>
-                      <th className="py-2 px-2 font-semibold text-right">6s</th>
-                      <th className="py-2 pl-2 font-semibold text-right">SR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {innings.battingOrder.map((pid) => {
-                      const b = innings.batsmen[pid];
-                      if (!b) return null;
-                      const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "0.0";
-                      return (
-                        <tr key={pid} className="border-b border-foreground/5 last:border-0">
-                          <td className="py-2.5 pr-4 font-medium text-foreground">
-                            {b.name}
-                            {b.isOnStrike && <span className="text-accent ml-1">*</span>}
-                            {b.isOut && <p className="text-xs text-foreground/50">{b.dismissal}</p>}
-                            {!b.isOut && !b.isOnStrike && pid !== innings.strikerId && pid !== innings.nonStrikerId && (
-                              <p className="text-xs text-foreground/50">not out</p>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.runs}</td>
-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.balls}</td>
-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.fours}</td>
-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.sixes}</td>
-                          <td className="py-2.5 pl-2 text-right text-foreground/70">{sr}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <h2 className="text-lg font-bold text-foreground mt-6 mb-4">Bowling — {innings.bowlingTeam}</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-foreground/50 text-left border-b border-foreground/10">
-                      <th className="py-2 pr-4 font-semibold">Bowler</th>
-                      <th className="py-2 px-2 font-semibold text-right">O</th>
-                      <th className="py-2 px-2 font-semibold text-right">R</th>
-                      <th className="py-2 px-2 font-semibold text-right">W</th>
-                      <th className="py-2 pl-2 font-semibold text-right">Econ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.values(innings.bowlers).map((b) => {
-                      const totalOversFloat = Math.floor(b.overs) + b.ballsThisOver / 6;
-                      const econ = totalOversFloat > 0 ? (b.runsConceded / totalOversFloat).toFixed(2) : "0.00";
-                      return (
-                        <tr key={b.playerId} className="border-b border-foreground/5 last:border-0">
-                          <td className="py-2.5 pr-4 font-medium text-foreground">{b.name}</td>
-                          <td className="py-2.5 px-2 text-right text-foreground/70">
-                            {Math.floor(b.overs)}.{b.ballsThisOver}
-                          </td>
-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.runsConceded}</td>
-                          <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.wickets}</td>
-                          <td className="py-2.5 pl-2 text-right text-foreground/70">{econ}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              {state.innings.map((inn, i) => (
+                <InningsScorecard key={i} inn={inn} title={`${i === 0 ? "1st" : "2nd"} innings`} live={live && !inn.isComplete} />
+              ))}
             </motion.div>
           ) : (
             <motion.div
@@ -344,16 +282,6 @@ export default function ViewerPage() {
           )}
         </AnimatePresence>
 
-        {firstInnings && state.currentInningsIndex === 1 && (
-          <motion.div
-            className="mt-6 bg-card/60 backdrop-blur-xl rounded-2xl p-4 text-sm text-foreground/70"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            1st Innings: {firstInnings.battingTeam} scored {firstInnings.totalRuns}/{firstInnings.totalWickets} in{" "}
-            {firstInnings.totalOvers}.{firstInnings.ballsInCurrentOver} overs
-          </motion.div>
-        )}
       </div>
     </section>
     </>
@@ -398,6 +326,93 @@ function BatsmanCard({
       <p className="text-xs text-foreground/60 mt-1">
         {fours ?? 0} fours · {sixes ?? 0} sixes · SR {sr}
       </p>
+    </div>
+  );
+}
+function InningsScorecard({ inn, title, live }: { inn: InningsState; title: string; live: boolean }) {
+  return (
+    <div className="mb-8 last:mb-0">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="text-lg font-bold text-foreground">
+          {title} · {inn.battingTeam}
+        </h2>
+        <p className="text-sm font-semibold text-foreground/70">
+          {inn.totalRuns}/{inn.totalWickets} ({inn.totalOvers}.{inn.ballsInCurrentOver})
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-foreground/50 text-left border-b border-foreground/10">
+              <th className="py-2 pr-4 font-semibold">Batter</th>
+              <th className="py-2 px-2 font-semibold text-right">R</th>
+              <th className="py-2 px-2 font-semibold text-right">B</th>
+              <th className="py-2 px-2 font-semibold text-right">4s</th>
+              <th className="py-2 px-2 font-semibold text-right">6s</th>
+              <th className="py-2 pl-2 font-semibold text-right">SR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inn.battingOrder.map((pid) => {
+              const b = inn.batsmen[pid];
+              if (!b) return null;
+              const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "0.0";
+              const atCrease = pid === inn.strikerId || pid === inn.nonStrikerId;
+              return (
+                <tr key={pid} className="border-b border-foreground/5 last:border-0">
+                  <td className="py-2.5 pr-4 font-medium text-foreground">
+                    {b.name}
+                    {live && b.isOnStrike && <span className="text-accent ml-1">*</span>}
+                    {b.isOut ? (
+                      <p className="text-xs text-foreground/50">{b.dismissal}</p>
+                    ) : (
+                      <p className="text-xs text-foreground/50">{live && !atCrease ? "" : live ? "batting" : "not out"}</p>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.runs}</td>
+                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.balls}</td>
+                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.fours}</td>
+                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.sixes}</td>
+                  <td className="py-2.5 pl-2 text-right text-foreground/70">{sr}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 className="text-sm font-bold text-foreground mt-5 mb-3">Bowling · {inn.bowlingTeam}</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-foreground/50 text-left border-b border-foreground/10">
+              <th className="py-2 pr-4 font-semibold">Bowler</th>
+              <th className="py-2 px-2 font-semibold text-right">O</th>
+              <th className="py-2 px-2 font-semibold text-right">R</th>
+              <th className="py-2 px-2 font-semibold text-right">W</th>
+              <th className="py-2 pl-2 font-semibold text-right">Econ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.values(inn.bowlers).map((b) => {
+              const oversFloat = Math.floor(b.overs) + b.ballsThisOver / 6;
+              const econ = oversFloat > 0 ? (b.runsConceded / oversFloat).toFixed(2) : "0.00";
+              return (
+                <tr key={b.playerId} className="border-b border-foreground/5 last:border-0">
+                  <td className="py-2.5 pr-4 font-medium text-foreground">{b.name}</td>
+                  <td className="py-2.5 px-2 text-right text-foreground/70">
+                    {Math.floor(b.overs)}.{b.ballsThisOver}
+                  </td>
+                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.runsConceded}</td>
+                  <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.wickets}</td>
+                  <td className="py-2.5 pl-2 text-right text-foreground/70">{econ}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

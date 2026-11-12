@@ -28,6 +28,10 @@ export interface BallEvent {
   isWicket: boolean;
   wicketType?: WicketType;
   outPlayerId?: string;
+  fielderId?: string; // caught by / wicketkeeper (stumped) / run out by
+  fielderName?: string;
+  assistIds?: string[]; // run-out: everybody who helped
+  assistNames?: string[];
   strikerId: string;
   nonStrikerId: string;
   bowlerId: string;

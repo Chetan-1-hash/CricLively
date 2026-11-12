@@ -14,6 +14,8 @@ import { minimalScores } from "../lib/matchScore";
 import TournamentListAPI from "../API/TournamentAPI";
 import { toast } from "../hooks/use-toast";
 import ExtendTournamentDialog from "./ExtendTournamentDialog";
+import PointsTable from "./PointsTable";
+import Leaderboard from "./Leaderboard";
 import type { TournamentResponse } from "./data/TournamentEntity";
 
 
@@ -364,9 +366,7 @@ export default function DashboardMatches() {
                 className="bg-card/80 rounded-2xl p-6"
               >
                 <h2 className="text-xl font-bold mb-4">Points Table</h2>
-                <p className="text-foreground/70">
-                  Points table will appear here.
-                </p>
+                <PointsTable tournamentId={tournamentDetails.id} />
               </motion.div>
             )}
 
@@ -380,9 +380,7 @@ export default function DashboardMatches() {
                 className="bg-card/80 rounded-2xl p-6"
               >
                 <h2 className="text-xl font-bold mb-4">Leaderboard</h2>
-                <p className="text-foreground/70">
-                  Player stats & rankings will appear here.
-                </p>
+                <Leaderboard tournamentId={tournamentDetails.id} />
               </motion.div>
             )}
           </AnimatePresence>

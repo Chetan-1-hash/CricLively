@@ -1,0 +1,1662 @@
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/DTO/LeaderboardResponse.java b/Backend/CricLively/src/main/java/com/CricLively/DTO/LeaderboardResponse.java
+new file mode 100644
+index 0000000..c9be4b2
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/DTO/LeaderboardResponse.java
+@@ -0,0 +1,55 @@
++package com.CricLively.DTO;
++
++import lombok.Data;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/** Everybody's numbers for one tournament. The page sorts them into Batting / Bowling / MVP. */
++@Data
++public class LeaderboardResponse {
++
++    private List<PlayerRow> players = new ArrayList<>();
++    private List<String> mvpRules = new ArrayList<>();
++
++    @Data
++    public static class PlayerRow {
++        private String playerId;   // profile id
++        private String name;
++        private String team;
++        private int matches;
++
++        // batting
++        private int battingInnings;
++        private int runs;
++        private int balls;
++        private int highestScore;
++        private double average;
++        private double strikeRate;
++        private int fours;
++        private int sixes;
++        private int fifties;
++        private int hundreds;
++
++        // bowling
++        private int bowlingInnings;
++        private String overs = "0";
++        private int runsConceded;
++        private int wickets;
++        private String bestFigures = "-";
++        private double economy;
++        private int dotBalls;
++
++        // fielding
++        private int catches;
++        private int stumpings;
++        private int runOuts;
++        private int runOutAssists;
++
++        // MVP
++        private int battingPoints;
++        private int bowlingPoints;
++        private int fieldingPoints;
++        private int mvpPoints;
++    }
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/DTO/PointsTableRow.java b/Backend/CricLively/src/main/java/com/CricLively/DTO/PointsTableRow.java
+new file mode 100644
+index 0000000..5ca7580
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/DTO/PointsTableRow.java
+@@ -0,0 +1,29 @@
++package com.CricLively.DTO;
++
++import lombok.Data;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/** One line of a tournament's points table. */
++@Data
++public class PointsTableRow {
++    private int position;
++    private String teamId;
++    private String teamName;
++    private String logoImage;
++    private int played;
++    private int won;
++    private int lost;
++    private int tied;
++    private int noResult;
++    private int points;
++    private double nrr;                      // net run rate
++    private List<String> form = new ArrayList<>(); // last 5: W, L, T, N (oldest first)
++
++    // helpers while counting (not shown)
++    private transient int runsFor;
++    private transient int ballsFor;
++    private transient int runsAgainst;
++    private transient int ballsAgainst;
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Entities/Wicket.java b/Backend/CricLively/src/main/java/com/CricLively/Entities/Wicket.java
+index 2d56270..bfd0722 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Entities/Wicket.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Entities/Wicket.java
+@@ -27,5 +27,7 @@ public class Wicket {
+     private String fielderId;     // The player who took the catch or performed the run-out
+     private String assistantFielderId; // Optional: For combined run-outs (e.g., relay throw)
+ 
++    private java.util.List<String> assistFielderIds; // run-out: everybody who helped (can be several)
++
+     private Boolean isBowlerCredit; // True for Bowled, Caught, LBW; False for Run Out
+ }
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Repository/TeamRepository.java b/Backend/CricLively/src/main/java/com/CricLively/Repository/TeamRepository.java
+index caea206..617cf19 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Repository/TeamRepository.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Repository/TeamRepository.java
+@@ -11,6 +11,7 @@ import java.util.List;
+ public interface TeamRepository extends MongoRepository<Team, String> {
+ 
+     Team findTeamNameById(String id);
++    List<Team> findByTournamentId(String tournamentId);
+     List<TeamsList> findAllBy();
+     boolean existsByTournamentIdAndSquadPlayerIdsContaining(
+             String tournamentId,
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java b/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java
+index 9e1dfe3..5df7ddf 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/RestController/TournamentController.java
+@@ -6,6 +6,8 @@ import com.CricLively.DTO.ExtendTournamentRequest;
+ import com.CricLively.DTO.TournamentDashboardResponse;
+ import com.CricLively.Entities.Tournament;
+ import com.CricLively.Service.ImageStorageService;
++import com.CricLively.Service.LeaderboardService;
++import com.CricLively.Service.StandingsService;
+ import com.CricLively.Service.TournamentService;
+ import lombok.RequiredArgsConstructor;
+ import org.springframework.http.HttpStatus;
+@@ -28,6 +30,8 @@ public class TournamentController {
+ 
+     private final TournamentService tournamentService;
+     private final ImageStorageService imageStorageService;
++    private final StandingsService standingsService;
++    private final LeaderboardService leaderboardService;
+ 
+ 
+     @GetMapping
+@@ -84,6 +88,30 @@ public class TournamentController {
+         }
+     }
+ 
++    /** Team-wise points table: points, net run rate, form. Works out itself from the finished matches. */
++    @GetMapping("/{id}/points-table")
++    public ResponseEntity<?> pointsTable(@PathVariable String id, Authentication auth) {
++        try {
++            return ResponseEntity.ok(standingsService.pointsTable(id, auth));
++        } catch (AccessDeniedException e) {
++            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
++        } catch (NoSuchElementException e) {
++            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
++        }
++    }
++
++    /** Every player's batting, bowling, fielding and MVP numbers for this tournament. */
++    @GetMapping("/{id}/leaderboard")
++    public ResponseEntity<?> leaderboard(@PathVariable String id, Authentication auth) {
++        try {
++            return ResponseEntity.ok(leaderboardService.leaderboard(id, auth));
++        } catch (AccessDeniedException e) {
++            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
++        } catch (NoSuchElementException e) {
++            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
++        }
++    }
++
+     @PostMapping("/{id}/follow")
+     public ResponseEntity<?> follow(@PathVariable String id, Authentication auth) {
+         try {
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/LeaderboardService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/LeaderboardService.java
+new file mode 100644
+index 0000000..cac5807
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/LeaderboardService.java
+@@ -0,0 +1,256 @@
++package com.CricLively.Service;
++
++import com.CricLively.DTO.LeaderboardResponse;
++import com.CricLively.DTO.LeaderboardResponse.PlayerRow;
++import com.CricLively.Entities.BallByBall;
++import com.CricLively.Entities.Enums.MatchStatus;
++import com.CricLively.Entities.Match;
++import com.CricLively.Entities.Player;
++import com.CricLively.Entities.Profile;
++import com.CricLively.Entities.Team;
++import com.CricLively.Entities.Tournament;
++import com.CricLively.Entities.Wicket;
++import com.CricLively.Repository.BallByBallRepository;
++import com.CricLively.Repository.MatchRepository;
++import com.CricLively.Repository.PlayerRepository;
++import com.CricLively.Repository.ProfileRepository;
++import com.CricLively.Repository.TeamRepository;
++import com.CricLively.Repository.TournamentRepository;
++import lombok.RequiredArgsConstructor;
++import org.springframework.security.access.AccessDeniedException;
++import org.springframework.security.core.Authentication;
++import org.springframework.stereotype.Service;
++
++import java.util.*;
++
++/**
++ * Batting, bowling, fielding and MVP numbers of every player for ONE tournament.
++ * Only completed matches count (finished, or both innings over), so the table changes the moment a match ends.
++ */
++@Service
++@RequiredArgsConstructor
++public class LeaderboardService {
++
++    // MVP points (one place to change them)
++    static final int RUN = 1, FOUR_BONUS = 1, SIX_BONUS = 2, FIFTY_BONUS = 10, HUNDRED_BONUS = 25, DUCK = -5;
++    static final int WICKET = 25, DOT_BALL = 1, THREE_WICKETS = 10, FIVE_WICKETS = 25;
++    static final int CATCH = 10, STUMPING = 10, RUN_OUT = 10, RUN_OUT_ASSIST = 5;
++
++    private final TournamentRepository tournamentRepository;
++    private final MatchRepository matchRepository;
++    private final BallByBallRepository ballRepository;
++    private final TeamRepository teamRepository;
++    private final ProfileRepository profileRepository;
++    private final PlayerRepository playerRepository;
++    private final MatchAccessService accessService;
++
++    private static class Agg {
++        String id, team;
++        int matches;
++        int batInnings, runs, balls, fours, sixes, outs, highest, fifties, hundreds, ducks;
++        int bowlInnings, legalBalls, conceded, wickets, dots, bestW = -1, bestR, threeW, fiveW;
++        int catches, stumpings, runOuts, assists;
++    }
++
++    public LeaderboardResponse leaderboard(String tournamentId, Authentication auth) {
++        Tournament t = tournamentRepository.findTournamentById(tournamentId);
++        if (t == null) throw new NoSuchElementException("Tournament not found");
++        if (!accessService.canAccessTournament(accessService.actor(auth), t)) {
++            throw new AccessDeniedException("Follow this tournament to see its leaderboard");
++        }
++
++        Map<String, String> teamNames = new HashMap<>();
++        for (Team team : teamRepository.findByTournamentId(tournamentId)) teamNames.put(team.getId(), team.getTeamName());
++
++        Map<String, Agg> all = new LinkedHashMap<>();
++        for (Match m : matchRepository.findByTournamentId(tournamentId)) {
++            if (!MatchResultUtil.isCompleted(m)) continue;
++            addXi(all, m.getPlayingXiA(), teamNames.get(m.getTeamAId()));
++            addXi(all, m.getPlayingXiB(), teamNames.get(m.getTeamBId()));
++            for (int no = 1; no <= 2; no++) {
++                addInnings(all, ballRepository.findByMatchIdAndInningsNoOrderBySeqAsc(m.getId(), no));
++            }
++        }
++
++        Map<String, String> names = namesOf(all.keySet());
++        LeaderboardResponse out = new LeaderboardResponse();
++        for (Agg a : all.values()) out.getPlayers().add(toRow(a, names.getOrDefault(a.id, "Player")));
++        out.getMvpRules().addAll(List.of(
++                "Batting: " + RUN + " per run, +" + FOUR_BONUS + " per four, +" + SIX_BONUS + " per six, +" + FIFTY_BONUS
++                        + " for a fifty, +" + HUNDRED_BONUS + " for a hundred, " + DUCK + " for a duck",
++                "Bowling: " + WICKET + " per wicket, " + DOT_BALL + " per dot ball, +" + THREE_WICKETS
++                        + " for 3-4 wickets in an innings, +" + FIVE_WICKETS + " for 5 or more",
++                "Fielding: " + CATCH + " per catch, " + STUMPING + " per stumping, " + RUN_OUT + " per run-out, +"
++                        + RUN_OUT_ASSIST + " for each player who helped in a run-out"));
++        return out;
++    }
++
++    private void addXi(Map<String, Agg> all, List<String> xi, String teamName) {
++        if (xi == null) return;
++        for (String id : xi) {
++            Agg a = all.computeIfAbsent(id, k -> {
++                Agg n = new Agg();
++                n.id = k;
++                return n;
++            });
++            a.matches++;
++            if (teamName != null) a.team = teamName;
++        }
++    }
++
++    private Agg agg(Map<String, Agg> all, String id) {
++        return all.computeIfAbsent(id, k -> {
++            Agg n = new Agg();
++            n.id = k;
++            return n;
++        });
++    }
++
++    /** Counts one innings. bat: 0 runs 1 balls 2 fours 3 sixes 4 out;  bowl: 0 legal 1 conceded 2 wickets 3 dots. */
++    private void addInnings(Map<String, Agg> all, List<BallByBall> balls) {
++        Map<String, int[]> bat = new LinkedHashMap<>();
++        Map<String, int[]> bowl = new LinkedHashMap<>();
++
++        for (BallByBall b : balls) {
++            int runsBat = b.getRunsBatsman() == null ? 0 : b.getRunsBatsman();
++            int extra = b.getRunsExtra() == null ? 0 : b.getRunsExtra();
++            String ex = b.getExtraType();
++            boolean wide = "Wide".equalsIgnoreCase(ex);
++            boolean noBall = "NoBall".equalsIgnoreCase(ex);
++            Wicket w = b.getWicket();
++
++            for (String id : new String[]{b.getStrikerId(), b.getNonStrikerId(), b.getNewBatsmanId()}) {
++                if (id != null) bat.computeIfAbsent(id, k -> new int[5]);
++            }
++            if (b.getStrikerId() != null) {
++                int[] s = bat.get(b.getStrikerId());
++                s[0] += runsBat;
++                if (!wide) s[1]++;
++                if (runsBat == 4) s[2]++;
++                if (runsBat == 6) s[3]++;
++            }
++            if (w != null && w.getPlayerOutId() != null && w.getOutType() != Wicket.OutType.RETIRED_HURT) {
++                bat.computeIfAbsent(w.getPlayerOutId(), k -> new int[5])[4] = 1;
++            }
++
++            if (b.getBowlerId() != null) {
++                int[] o = bowl.computeIfAbsent(b.getBowlerId(), k -> new int[4]);
++                if (!wide && !noBall) {
++                    o[0]++;
++                    if (runsBat == 0) o[3]++;
++                }
++                o[1] += runsBat + ((wide || noBall) ? extra : 0);
++                if (w != null && b.getBowlerId().equals(w.getBowlerId()) && Boolean.TRUE.equals(w.getIsBowlerCredit())) o[2]++;
++            }
++
++            // fielding
++            if (w != null) {
++                Wicket.OutType type = w.getOutType();
++                if (type == Wicket.OutType.CAUGHT && w.getFielderId() != null) agg(all, w.getFielderId()).catches++;
++                if (type == Wicket.OutType.CAUGHT_BOWLED && w.getBowlerId() != null) agg(all, w.getBowlerId()).catches++;
++                if (type == Wicket.OutType.STUMPED && w.getFielderId() != null) agg(all, w.getFielderId()).stumpings++;
++                if (type == Wicket.OutType.RUNOUT) {
++                    if (w.getFielderId() != null) agg(all, w.getFielderId()).runOuts++;
++                    if (w.getAssistFielderIds() != null) {
++                        for (String id : w.getAssistFielderIds()) agg(all, id).assists++;
++                    }
++                }
++            }
++        }
++
++        for (Map.Entry<String, int[]> e : bat.entrySet()) {
++            Agg a = agg(all, e.getKey());
++            int[] s = e.getValue();
++            a.batInnings++;
++            a.runs += s[0];
++            a.balls += s[1];
++            a.fours += s[2];
++            a.sixes += s[3];
++            a.outs += s[4];
++            a.highest = Math.max(a.highest, s[0]);
++            if (s[0] >= 100) a.hundreds++; else if (s[0] >= 50) a.fifties++;
++            if (s[4] == 1 && s[0] == 0 && s[1] >= 1) a.ducks++;
++        }
++        for (Map.Entry<String, int[]> e : bowl.entrySet()) {
++            Agg a = agg(all, e.getKey());
++            int[] o = e.getValue();
++            a.bowlInnings++;
++            a.legalBalls += o[0];
++            a.conceded += o[1];
++            a.wickets += o[2];
++            a.dots += o[3];
++            if (o[2] >= 5) a.fiveW++; else if (o[2] >= 3) a.threeW++;
++            if (o[2] > a.bestW || (o[2] == a.bestW && o[1] < a.bestR)) {
++                a.bestW = o[2];
++                a.bestR = o[1];
++            }
++        }
++    }
++
++    private PlayerRow toRow(Agg a, String name) {
++        PlayerRow r = new PlayerRow();
++        r.setPlayerId(a.id);
++        r.setName(name);
++        r.setTeam(a.team);
++        r.setMatches(a.matches);
++
++        r.setBattingInnings(a.batInnings);
++        r.setRuns(a.runs);
++        r.setBalls(a.balls);
++        r.setHighestScore(a.highest);
++        r.setAverage(a.outs == 0 ? (a.batInnings == 0 ? 0 : a.runs) : round((double) a.runs / a.outs));
++        r.setStrikeRate(a.balls == 0 ? 0 : round(a.runs * 100.0 / a.balls));
++        r.setFours(a.fours);
++        r.setSixes(a.sixes);
++        r.setFifties(a.fifties);
++        r.setHundreds(a.hundreds);
++
++        r.setBowlingInnings(a.bowlInnings);
++        r.setOvers(a.legalBalls / 6 + (a.legalBalls % 6 == 0 ? "" : "." + a.legalBalls % 6));
++        r.setRunsConceded(a.conceded);
++        r.setWickets(a.wickets);
++        r.setBestFigures(a.bestW < 0 ? "-" : a.bestW + "/" + a.bestR);
++        r.setEconomy(a.legalBalls == 0 ? 0 : round(a.conceded * 6.0 / a.legalBalls));
++        r.setDotBalls(a.dots);
++
++        r.setCatches(a.catches);
++        r.setStumpings(a.stumpings);
++        r.setRunOuts(a.runOuts);
++        r.setRunOutAssists(a.assists);
++
++        int bp = a.runs * RUN + a.fours * FOUR_BONUS + a.sixes * SIX_BONUS + a.fifties * FIFTY_BONUS
++                + a.hundreds * HUNDRED_BONUS + a.ducks * DUCK;
++        int wp = a.wickets * WICKET + a.dots * DOT_BALL + a.threeW * THREE_WICKETS + a.fiveW * FIVE_WICKETS;
++        int fp = a.catches * CATCH + a.stumpings * STUMPING + a.runOuts * RUN_OUT + a.assists * RUN_OUT_ASSIST;
++        r.setBattingPoints(bp);
++        r.setBowlingPoints(wp);
++        r.setFieldingPoints(fp);
++        r.setMvpPoints(bp + wp + fp);
++        return r;
++    }
++
++    private Map<String, String> namesOf(Collection<String> profileIds) {
++        Map<String, Profile> profiles = new HashMap<>();
++        profileRepository.findAllById(profileIds).forEach(p -> profiles.put(p.getId(), p));
++        List<String> playerIds = new ArrayList<>();
++        profiles.values().forEach(p -> {
++            if (p.getPlayerId() != null) playerIds.add(p.getPlayerId());
++        });
++        Map<String, Player> players = new HashMap<>();
++        playerRepository.findAllById(playerIds).forEach(p -> players.put(p.getId(), p));
++
++        Map<String, String> names = new HashMap<>();
++        for (String id : profileIds) {
++            Profile p = profiles.get(id);
++            Player pl = p == null || p.getPlayerId() == null ? null : players.get(p.getPlayerId());
++            String name = pl == null ? null
++                    : ((pl.getFirstName() == null ? "" : pl.getFirstName()) + " " + (pl.getLastName() == null ? "" : pl.getLastName())).trim();
++            names.put(id, name == null || name.isEmpty() ? "Player" : name);
++        }
++        return names;
++    }
++
++    private static double round(double v) {
++        return Math.round(v * 100.0) / 100.0;
++    }
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/MatchResultUtil.java b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchResultUtil.java
+new file mode 100644
+index 0000000..39d1aae
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/MatchResultUtil.java
+@@ -0,0 +1,64 @@
++package com.CricLively.Service;
++
++import com.CricLively.Entities.Innings;
++import com.CricLively.Entities.Match;
++
++import java.util.List;
++
++/** Small helpers shared by the points table and the leaderboard. */
++public final class MatchResultUtil {
++
++    private MatchResultUtil() {
++    }
++
++    /** 15.2 overs (stored as a number) -> 92 balls. */
++    public static int ballsOf(Double oversCompleted) {
++        if (oversCompleted == null) return 0;
++        int overs = (int) Math.floor(oversCompleted + 1e-9);
++        int balls = (int) Math.round((oversCompleted - overs) * 10);
++        return overs * 6 + balls;
++    }
++
++    /** The team was all out when every batter but one was out. */
++    public static boolean allOut(Match match, Innings innings) {
++        if (innings == null || innings.getWicketsLost() == null) return false;
++        List<String> xi = innings.getBattingTeamId() != null && innings.getBattingTeamId().equals(match.getTeamAId())
++                ? match.getPlayingXiA() : match.getPlayingXiB();
++        int maxWickets = xi == null || xi.size() < 2 ? 10 : xi.size() - 1;
++        return innings.getWicketsLost() >= maxWickets;
++    }
++
++    /** Balls used for net run rate: a team that was all out is counted as if it faced its full quota. */
++    public static int ballsForNrr(Match match, Innings innings) {
++        int quota = (match.getOversPerInnings() == null ? 20 : match.getOversPerInnings()) * 6;
++        return allOut(match, innings) ? quota : ballsOf(innings.getOversCompleted());
++    }
++
++    /** Team id of the winner, or null for a tie / no result. */
++    public static String winnerTeamId(Match match) {
++        Innings i1 = match.getInnings1();
++        Innings i2 = match.getInnings2();
++        if (i1 == null || i2 == null || i1.getTotalRuns() == null || i2.getTotalRuns() == null) return null;
++        if (i2.getTotalRuns() > i1.getTotalRuns()) return i2.getBattingTeamId();
++        if (i2.getTotalRuns() < i1.getTotalRuns()) return i1.getBattingTeamId();
++        return null;
++    }
++
++    /**
++     * Counts for the tables: the scorer pressed "Finish", or both innings are already over
++     * (so the tables do not wait for a button).
++     */
++    public static boolean isCompleted(Match match) {
++        if (!hasResult(match)) return false;
++        if (match.getMatchStatus() == com.CricLively.Entities.Enums.MatchStatus.FINISHED) return true;
++        return match.getMatchStatus() == com.CricLively.Entities.Enums.MatchStatus.LIVE
++                && Boolean.TRUE.equals(match.getInnings1().getIsCompleted())
++                && Boolean.TRUE.equals(match.getInnings2().getIsCompleted());
++    }
++
++    /** A finished match with both innings played. */
++    public static boolean hasResult(Match match) {
++        return match.getInnings1() != null && match.getInnings2() != null
++                && match.getInnings1().getTotalRuns() != null && match.getInnings2().getTotalRuns() != null;
++    }
++}
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java
+index 377e0bd..b791f36 100644
+--- a/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/ScoringService.java
+@@ -190,6 +190,8 @@ public class ScoringService {
+             throw new IllegalArgumentException("Runs are out of range");
+         }
+ 
++        checkFielders(match, innings, ball);
++
+         ball.setId(null);                 // always a NEW record
+         ball.setMatchId(matchId);         // the match always comes from the URL
+         ball.setSeq(ballRepository.countByMatchIdAndInningsNo(matchId, no) + 1);
+@@ -199,6 +201,39 @@ public class ScoringService {
+         return saved;
+     }
+ 
++    /** Catch / stumping / run-out: who did it must be a player of the bowling team. */
++    private void checkFielders(Match match, Innings innings, BallByBall ball) {
++        Wicket w = ball.getWicket();
++        if (w == null) return;
++        List<String> fieldingXi = Objects.equals(innings.getBowlingTeamId(), match.getTeamAId())
++                ? match.getPlayingXiA() : match.getPlayingXiB();
++        Wicket.OutType type = w.getOutType();
++
++        boolean needsFielder = type == Wicket.OutType.CAUGHT || type == Wicket.OutType.STUMPED
++                || type == Wicket.OutType.RUNOUT;
++        if (needsFielder && isBlank(w.getFielderId())) {
++            throw new IllegalArgumentException("Pick the fielder for this dismissal (catch, stumping or run-out)");
++        }
++        if (!isBlank(w.getFielderId()) && (fieldingXi == null || !fieldingXi.contains(w.getFielderId()))) {
++            throw new IllegalArgumentException("The fielder must be from the bowling team's playing team");
++        }
++
++        List<String> assists = new ArrayList<>();
++        if (type == Wicket.OutType.RUNOUT && w.getAssistFielderIds() != null) {
++            for (String id : new LinkedHashSet<>(w.getAssistFielderIds())) {
++                if (isBlank(id) || id.equals(w.getFielderId())) continue;
++                if (fieldingXi == null || !fieldingXi.contains(id)) {
++                    throw new IllegalArgumentException("Everybody who helped in the run-out must be from the bowling team");
++                }
++                assists.add(id);
++            }
++        }
++        w.setAssistFielderIds(assists);
++        if (type != Wicket.OutType.CAUGHT && type != Wicket.OutType.STUMPED && type != Wicket.OutType.RUNOUT) {
++            w.setFielderId(null);
++        }
++    }
++
+     /** Remove the most recent ball of an innings and recompute the totals. */
+     public void undoLastBall(String matchId, int inningsNo) {
+         Match match = findMatch(matchId);
+diff --git a/Backend/CricLively/src/main/java/com/CricLively/Service/StandingsService.java b/Backend/CricLively/src/main/java/com/CricLively/Service/StandingsService.java
+new file mode 100644
+index 0000000..5ac91e1
+--- /dev/null
++++ b/Backend/CricLively/src/main/java/com/CricLively/Service/StandingsService.java
+@@ -0,0 +1,138 @@
++package com.CricLively.Service;
++
++import com.CricLively.DTO.PointsTableRow;
++import com.CricLively.Entities.Enums.MatchStatus;
++import com.CricLively.Entities.Innings;
++import com.CricLively.Entities.Match;
++import com.CricLively.Entities.Team;
++import com.CricLively.Entities.Tournament;
++import com.CricLively.Repository.MatchRepository;
++import com.CricLively.Repository.TeamRepository;
++import com.CricLively.Repository.TournamentRepository;
++import lombok.RequiredArgsConstructor;
++import org.springframework.security.access.AccessDeniedException;
++import org.springframework.security.core.Authentication;
++import org.springframework.stereotype.Service;
++
++import java.util.*;
++
++/**
++ * Points table, worked out from the finished matches every time it is asked for,
++ * so it is always up to date (win = 2, tie = 1, no result / abandoned = 1, loss = 0).
++ * Teams with equal points are ordered by net run rate, then by wins.
++ */
++@Service
++@RequiredArgsConstructor
++public class StandingsService {
++
++    private static final int WIN = 2, TIE = 1, NO_RESULT = 1;
++
++    private final TournamentRepository tournamentRepository;
++    private final TeamRepository teamRepository;
++    private final MatchRepository matchRepository;
++    private final MatchAccessService accessService;
++
++    public List<PointsTableRow> pointsTable(String tournamentId, Authentication auth) {
++        Tournament t = tournamentRepository.findTournamentById(tournamentId);
++        if (t == null) throw new NoSuchElementException("Tournament not found");
++        if (!accessService.canAccessTournament(accessService.actor(auth), t)) {
++            throw new AccessDeniedException("Follow this tournament to see its points table");
++        }
++
++        Map<String, PointsTableRow> rows = new LinkedHashMap<>();
++        for (Team team : teamRepository.findByTournamentId(tournamentId)) {
++            rows.put(team.getId(), newRow(team.getId(), team.getTeamName(), team.getLogoImage()));
++        }
++
++        List<Match> matches = new ArrayList<>(matchRepository.findByTournamentId(tournamentId));
++        matches.sort((x, y) -> {
++            int c = compareNullsLast(x.getDate(), y.getDate());
++            return c != 0 ? c : compareNullsLast(x.getTime(), y.getTime());
++        });
++
++        for (Match m : matches) {
++            if (m.getMatchStatus() == MatchStatus.ABANDONED) {
++                for (String id : List.of(m.getTeamAId(), m.getTeamBId())) {
++                    PointsTableRow r = row(rows, id);
++                    r.setPlayed(r.getPlayed() + 1);
++                    r.setNoResult(r.getNoResult() + 1);
++                    r.setPoints(r.getPoints() + NO_RESULT);
++                    r.getForm().add("N");
++                }
++                continue;
++            }
++            if (!MatchResultUtil.isCompleted(m)) continue;
++
++            // runs and balls for the net run rate
++            for (Innings i : List.of(m.getInnings1(), m.getInnings2())) {
++                PointsTableRow bat = row(rows, i.getBattingTeamId());
++                PointsTableRow bowl = row(rows, i.getBowlingTeamId());
++                int balls = MatchResultUtil.ballsForNrr(m, i);
++                int runs = i.getTotalRuns();
++                bat.setRunsFor(bat.getRunsFor() + runs);
++                bat.setBallsFor(bat.getBallsFor() + balls);
++                bowl.setRunsAgainst(bowl.getRunsAgainst() + runs);
++                bowl.setBallsAgainst(bowl.getBallsAgainst() + balls);
++            }
++
++            String winner = MatchResultUtil.winnerTeamId(m);
++            for (String id : List.of(m.getTeamAId(), m.getTeamBId())) {
++                PointsTableRow r = row(rows, id);
++                r.setPlayed(r.getPlayed() + 1);
++                if (winner == null) {
++                    r.setTied(r.getTied() + 1);
++                    r.setPoints(r.getPoints() + TIE);
++                    r.getForm().add("T");
++                } else if (winner.equals(id)) {
++                    r.setWon(r.getWon() + 1);
++                    r.setPoints(r.getPoints() + WIN);
++                    r.getForm().add("W");
++                } else {
++                    r.setLost(r.getLost() + 1);
++                    r.getForm().add("L");
++                }
++            }
++        }
++
++        List<PointsTableRow> out = new ArrayList<>(rows.values());
++        for (PointsTableRow r : out) {
++            double scored = r.getBallsFor() == 0 ? 0 : r.getRunsFor() / (r.getBallsFor() / 6.0);
++            double conceded = r.getBallsAgainst() == 0 ? 0 : r.getRunsAgainst() / (r.getBallsAgainst() / 6.0);
++            r.setNrr(Math.round((scored - conceded) * 1000.0) / 1000.0);
++            List<String> form = r.getForm();
++            if (form.size() > 5) r.setForm(new ArrayList<>(form.subList(form.size() - 5, form.size())));
++        }
++        out.sort((x, y) -> {
++            if (x.getPoints() != y.getPoints()) return Integer.compare(y.getPoints(), x.getPoints());
++            if (x.getNrr() != y.getNrr()) return Double.compare(y.getNrr(), x.getNrr());
++            if (x.getWon() != y.getWon()) return Integer.compare(y.getWon(), x.getWon());
++            String nx = x.getTeamName() == null ? "" : x.getTeamName();
++            String ny = y.getTeamName() == null ? "" : y.getTeamName();
++            return nx.compareToIgnoreCase(ny);
++        });
++        for (int i = 0; i < out.size(); i++) out.get(i).setPosition(i + 1);
++        return out;
++    }
++
++    private static <T extends Comparable<? super T>> int compareNullsLast(T a, T b) {
++        if (a == null && b == null) return 0;
++        if (a == null) return 1;
++        if (b == null) return -1;
++        return a.compareTo(b);
++    }
++
++    private PointsTableRow row(Map<String, PointsTableRow> rows, String teamId) {
++        return rows.computeIfAbsent(teamId, id -> {
++            Team team = teamRepository.findById(id).orElse(null);
++            return newRow(id, team == null ? "Team" : team.getTeamName(), team == null ? null : team.getLogoImage());
++        });
++    }
++
++    private static PointsTableRow newRow(String id, String name, String logo) {
++        PointsTableRow r = new PointsTableRow();
++        r.setTeamId(id);
++        r.setTeamName(name);
++        r.setLogoImage(logo);
++        return r;
++    }
++}
+diff --git a/Frontend/CricLively/src/API/ScoringAPI.ts b/Frontend/CricLively/src/API/ScoringAPI.ts
+index 7d54af1..056cd36 100644
+--- a/Frontend/CricLively/src/API/ScoringAPI.ts
++++ b/Frontend/CricLively/src/API/ScoringAPI.ts
+@@ -8,6 +8,8 @@ export interface ApiWicket {
+   playerOutId: string | null;
+   outType: string; // BOWLED, CAUGHT, LBW, RUNOUT, STUMPED, HITWICKET, RETIRED_HURT
+   bowlerId: string | null;
++  fielderId?: string | null; // caught by / stumped by / run out by
++  assistFielderIds?: string[]; // run-out helpers
+   isBowlerCredit: boolean;
+ }
+ 
+diff --git a/Frontend/CricLively/src/API/TournamentTablesAPI.ts b/Frontend/CricLively/src/API/TournamentTablesAPI.ts
+new file mode 100644
+index 0000000..ce264c1
+--- /dev/null
++++ b/Frontend/CricLively/src/API/TournamentTablesAPI.ts
+@@ -0,0 +1,55 @@
++import { api } from "./client";
++
++export interface PointsRow {
++  position: number;
++  teamId: string;
++  teamName: string;
++  played: number;
++  won: number;
++  lost: number;
++  tied: number;
++  noResult: number;
++  points: number;
++  nrr: number;
++  form: string[]; // W, L, T, N
++}
++
++export interface LeaderPlayer {
++  playerId: string;
++  name: string;
++  team: string | null;
++  matches: number;
++  battingInnings: number;
++  runs: number;
++  balls: number;
++  highestScore: number;
++  average: number;
++  strikeRate: number;
++  fours: number;
++  sixes: number;
++  fifties: number;
++  hundreds: number;
++  bowlingInnings: number;
++  overs: string;
++  runsConceded: number;
++  wickets: number;
++  bestFigures: string;
++  economy: number;
++  dotBalls: number;
++  catches: number;
++  stumpings: number;
++  runOuts: number;
++  runOutAssists: number;
++  battingPoints: number;
++  bowlingPoints: number;
++  fieldingPoints: number;
++  mvpPoints: number;
++}
++
++export interface LeaderboardData {
++  players: LeaderPlayer[];
++  mvpRules: string[];
++}
++
++export const getPointsTable = (tournamentId: string) => api<PointsRow[]>(`/tournaments/${tournamentId}/points-table`);
++export const getLeaderboard = (tournamentId: string) => api<LeaderboardData>(`/tournaments/${tournamentId}/leaderboard`);
+diff --git a/Frontend/CricLively/src/components/DashboardMatches.tsx b/Frontend/CricLively/src/components/DashboardMatches.tsx
+index 436d5fa..ffc6a9c 100644
+--- a/Frontend/CricLively/src/components/DashboardMatches.tsx
++++ b/Frontend/CricLively/src/components/DashboardMatches.tsx
+@@ -14,6 +14,8 @@ import { minimalScores } from "../lib/matchScore";
+ import TournamentListAPI from "../API/TournamentAPI";
+ import { toast } from "../hooks/use-toast";
+ import ExtendTournamentDialog from "./ExtendTournamentDialog";
++import PointsTable from "./PointsTable";
++import Leaderboard from "./Leaderboard";
+ import type { TournamentResponse } from "./data/TournamentEntity";
+ 
+ 
+@@ -364,9 +366,7 @@ export default function DashboardMatches() {
+                 className="bg-card/80 rounded-2xl p-6"
+               >
+                 <h2 className="text-xl font-bold mb-4">Points Table</h2>
+-                <p className="text-foreground/70">
+-                  Points table will appear here.
+-                </p>
++                <PointsTable tournamentId={tournamentDetails.id} />
+               </motion.div>
+             )}
+ 
+@@ -380,9 +380,7 @@ export default function DashboardMatches() {
+                 className="bg-card/80 rounded-2xl p-6"
+               >
+                 <h2 className="text-xl font-bold mb-4">Leaderboard</h2>
+-                <p className="text-foreground/70">
+-                  Player stats & rankings will appear here.
+-                </p>
++                <Leaderboard tournamentId={tournamentDetails.id} />
+               </motion.div>
+             )}
+           </AnimatePresence>
+diff --git a/Frontend/CricLively/src/components/Leaderboard.tsx b/Frontend/CricLively/src/components/Leaderboard.tsx
+new file mode 100644
+index 0000000..4879bf6
+--- /dev/null
++++ b/Frontend/CricLively/src/components/Leaderboard.tsx
+@@ -0,0 +1,134 @@
++import { useCallback, useEffect, useMemo, useState } from "react";
++import { getLeaderboard, type LeaderboardData, type LeaderPlayer } from "../API/TournamentTablesAPI";
++import { useLiveUpdates } from "../lib/useLiveUpdates";
++
++type Tab = "bat" | "bowl" | "mvp";
++
++const th = "py-2 px-2 font-semibold text-right";
++const td = "py-3 px-2 text-right text-foreground/80";
++
++// Every player's numbers for the whole tournament (completed matches only).
++export default function Leaderboard({ tournamentId }: { tournamentId: string }) {
++  const [data, setData] = useState<LeaderboardData | null>(null);
++  const [error, setError] = useState("");
++  const [tab, setTab] = useState<Tab>("bat");
++
++  const load = useCallback(async () => {
++    try {
++      setData(await getLeaderboard(tournamentId));
++      setError("");
++    } catch (e) {
++      setError((e as Error).message || "Could not load the leaderboard");
++    }
++  }, [tournamentId]);
++
++  useEffect(() => {
++    load();
++  }, [load]);
++  useLiveUpdates("*", load);
++
++  const rows: LeaderPlayer[] = useMemo(() => {
++    const all = data?.players ?? [];
++    if (tab === "bat") return all.filter((p) => p.battingInnings > 0).sort((a, b) => b.runs - a.runs || b.strikeRate - a.strikeRate);
++    if (tab === "bowl") return all.filter((p) => p.bowlingInnings > 0).sort((a, b) => b.wickets - a.wickets || a.economy - b.economy);
++    return [...all].sort((a, b) => b.mvpPoints - a.mvpPoints);
++  }, [data, tab]);
++
++  if (error) return <p className="text-red-600">{error}</p>;
++  if (!data) return <p className="text-foreground/70">Loading…</p>;
++
++  return (
++    <>
++      <div className="flex gap-2 mb-5">
++        {([["bat", "Batting"], ["bowl", "Bowling"], ["mvp", "MVP"]] as [Tab, string][]).map(([id, label]) => (
++          <button
++            key={id}
++            onClick={() => setTab(id)}
++            className={`px-5 py-2 rounded-full text-sm font-semibold ${tab === id ? "bg-red-600 text-white" : "bg-red-600/20 text-red-600"}`}
++          >
++            {label}
++          </button>
++        ))}
++      </div>
++
++      {rows.length === 0 ? (
++        <p className="text-foreground/70">Nothing here yet. Numbers appear once a match of this tournament is finished.</p>
++      ) : (
++        <div className="overflow-x-auto">
++          <table className="w-full text-sm">
++            <thead>
++              <tr className="text-foreground/60 text-left border-b border-foreground/10">
++                <th className="py-2 pr-2 font-semibold">#</th>
++                <th className="py-2 pr-4 font-semibold">Player</th>
++                {tab === "bat" && (
++                  <>
++                    <th className={th}>M</th><th className={th}>Inn</th><th className={th}>Runs</th><th className={th}>HS</th>
++                    <th className={th}>Avg</th><th className={th}>SR</th><th className={th}>4s</th><th className={th}>6s</th>
++                    <th className={th}>50/100</th>
++                  </>
++                )}
++                {tab === "bowl" && (
++                  <>
++                    <th className={th}>M</th><th className={th}>Inn</th><th className={th}>Overs</th><th className={th}>Runs</th>
++                    <th className={th}>Wkts</th><th className={th}>Best</th><th className={th}>Econ</th><th className={th}>Dots</th>
++                  </>
++                )}
++                {tab === "mvp" && (
++                  <>
++                    <th className={th}>M</th><th className={th}>Bat</th><th className={th}>Bowl</th>
++                    <th className={th}>Field</th><th className={th}>Catches</th><th className={th}>Run-outs</th>
++                    <th className={th}>MVP</th>
++                  </>
++                )}
++              </tr>
++            </thead>
++            <tbody>
++              {rows.map((p, i) => (
++                <tr key={p.playerId} className="border-b border-foreground/5 last:border-0">
++                  <td className="py-3 pr-2 font-semibold text-foreground">{i + 1}</td>
++                  <td className="py-3 pr-4 font-semibold text-foreground">
++                    {p.name}
++                    {p.team && <p className="text-xs font-normal text-foreground/60">{p.team}</p>}
++                  </td>
++                  {tab === "bat" && (
++                    <>
++                      <td className={td}>{p.matches}</td><td className={td}>{p.battingInnings}</td>
++                      <td className={`${td} font-extrabold !text-foreground`}>{p.runs}</td><td className={td}>{p.highestScore}</td>
++                      <td className={td}>{p.average.toFixed(2)}</td><td className={td}>{p.strikeRate.toFixed(2)}</td>
++                      <td className={td}>{p.fours}</td><td className={td}>{p.sixes}</td>
++                      <td className={td}>{p.fifties}/{p.hundreds}</td>
++                    </>
++                  )}
++                  {tab === "bowl" && (
++                    <>
++                      <td className={td}>{p.matches}</td><td className={td}>{p.bowlingInnings}</td>
++                      <td className={td}>{p.overs}</td><td className={td}>{p.runsConceded}</td>
++                      <td className={`${td} font-extrabold !text-foreground`}>{p.wickets}</td><td className={td}>{p.bestFigures}</td>
++                      <td className={td}>{p.economy.toFixed(2)}</td><td className={td}>{p.dotBalls}</td>
++                    </>
++                  )}
++                  {tab === "mvp" && (
++                    <>
++                      <td className={td}>{p.matches}</td><td className={td}>{p.battingPoints}</td>
++                      <td className={td}>{p.bowlingPoints}</td><td className={td}>{p.fieldingPoints}</td>
++                      <td className={td}>{p.catches + p.stumpings}</td><td className={td}>{p.runOuts}{p.runOutAssists ? ` (+${p.runOutAssists})` : ""}</td>
++                      <td className={`${td} font-extrabold !text-foreground`}>{p.mvpPoints}</td>
++                    </>
++                  )}
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        </div>
++      )}
++
++      {tab === "mvp" && (
++        <ul className="text-xs text-foreground/60 mt-4 space-y-1 list-disc pl-4">
++          {data.mvpRules.map((r) => (
++            <li key={r}>{r}</li>
++          ))}
++        </ul>
++      )}
++    </>
++  );
++}
+diff --git a/Frontend/CricLively/src/components/PointsTable.tsx b/Frontend/CricLively/src/components/PointsTable.tsx
+new file mode 100644
+index 0000000..6d704bb
+--- /dev/null
++++ b/Frontend/CricLively/src/components/PointsTable.tsx
+@@ -0,0 +1,89 @@
++import { useCallback, useEffect, useState } from "react";
++import { getPointsTable, type PointsRow } from "../API/TournamentTablesAPI";
++import { useLiveUpdates } from "../lib/useLiveUpdates";
++
++const FORM_STYLE: Record<string, string> = {
++  W: "bg-green-700 text-white",
++  L: "bg-red-600 text-white",
++  T: "bg-yellow-500 text-black",
++  N: "bg-foreground/30 text-foreground",
++};
++
++// Team-wise points table. It is worked out by the server from the finished matches,
++// and this page reloads by itself whenever a match changes.
++export default function PointsTable({ tournamentId }: { tournamentId: string }) {
++  const [rows, setRows] = useState<PointsRow[] | null>(null);
++  const [error, setError] = useState("");
++
++  const load = useCallback(async () => {
++    try {
++      setRows(await getPointsTable(tournamentId));
++      setError("");
++    } catch (e) {
++      setError((e as Error).message || "Could not load the points table");
++    }
++  }, [tournamentId]);
++
++  useEffect(() => {
++    load();
++  }, [load]);
++  useLiveUpdates("*", load);
++
++  if (error) return <p className="text-red-600">{error}</p>;
++  if (!rows) return <p className="text-foreground/70">Loading…</p>;
++  if (rows.length === 0) return <p className="text-foreground/70">No teams in this tournament yet.</p>;
++
++  return (
++    <>
++      <div className="overflow-x-auto">
++        <table className="w-full text-sm">
++          <thead>
++            <tr className="text-foreground/60 text-left border-b border-foreground/10">
++              <th className="py-2 pr-2 font-semibold">#</th>
++              <th className="py-2 pr-4 font-semibold">Team</th>
++              <th className="py-2 px-2 font-semibold text-right">P</th>
++              <th className="py-2 px-2 font-semibold text-right">W</th>
++              <th className="py-2 px-2 font-semibold text-right">L</th>
++              <th className="py-2 px-2 font-semibold text-right">T</th>
++              <th className="py-2 px-2 font-semibold text-right">NR</th>
++              <th className="py-2 px-2 font-semibold text-right">Pts</th>
++              <th className="py-2 px-2 font-semibold text-right">NRR</th>
++              <th className="py-2 pl-4 font-semibold">Form</th>
++            </tr>
++          </thead>
++          <tbody>
++            {rows.map((r) => (
++              <tr key={r.teamId} className="border-b border-foreground/5 last:border-0">
++                <td className="py-3 pr-2 font-semibold text-foreground">{r.position}</td>
++                <td className="py-3 pr-4 font-semibold text-foreground">{r.teamName}</td>
++                <td className="py-3 px-2 text-right text-foreground/80">{r.played}</td>
++                <td className="py-3 px-2 text-right text-foreground/80">{r.won}</td>
++                <td className="py-3 px-2 text-right text-foreground/80">{r.lost}</td>
++                <td className="py-3 px-2 text-right text-foreground/80">{r.tied}</td>
++                <td className="py-3 px-2 text-right text-foreground/80">{r.noResult}</td>
++                <td className="py-3 px-2 text-right font-extrabold text-foreground">{r.points}</td>
++                <td className="py-3 px-2 text-right text-foreground/80">
++                  {r.nrr > 0 ? "+" : ""}
++                  {r.nrr.toFixed(3)}
++                </td>
++                <td className="py-3 pl-4">
++                  <div className="flex gap-1">
++                    {r.form.map((f, i) => (
++                      <span key={i} className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${FORM_STYLE[f] ?? ""}`}>
++                        {f}
++                      </span>
++                    ))}
++                  </div>
++                </td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </div>
++      <p className="text-xs text-foreground/60 mt-4">
++        Win 2 points · Tie 1 · No result or abandoned 1 · Loss 0. Teams on equal points are ordered by net run rate (NRR),
++        then by wins. NRR = runs scored per over − runs conceded per over; a team that is all out counts its full overs.
++      </p>
++    </>
++  );
++}
+diff --git a/Frontend/CricLively/src/components/Scorer.tsx b/Frontend/CricLively/src/components/Scorer.tsx
+index 12b1e47..a09e8f3 100644
+--- a/Frontend/CricLively/src/components/Scorer.tsx
++++ b/Frontend/CricLively/src/components/Scorer.tsx
+@@ -18,6 +18,7 @@ import Navbar from "./Navbar";
+ import { InningsSetupPanel, TossPanel } from "./ScorerSetup";
+ import LineupPanel from "./LineupPanel";
+ import { useLiveUpdates } from "../lib/useLiveUpdates";
++import { describeResult } from "../lib/matchResult";
+ import ScorerAccessDialog from "./ScorerAccessDialog";
+ 
+ const WICKET_TYPES: WicketType[] = ["Bowled", "Caught", "LBW", "Run Out", "Stumped", "Hit Wicket", "Retired Hurt"];
+@@ -91,6 +92,9 @@ export default function Scorer() {
+   const [showNewBatsmanPicker, setShowNewBatsmanPicker] = useState(false);
+   const [pendingOutPlayerId, setPendingOutPlayerId] = useState<string | null>(null);
+   const [showBowlerPicker, setShowBowlerPicker] = useState(false);
++  const [startedSecond, setStartedSecond] = useState(false); // the scorer agreed to start the 2nd innings
++  const [fielderId, setFielderId] = useState(""); // caught by / stumped by / run out by
++  const [assistIds, setAssistIds] = useState<string[]>([]); // run-out helpers (several allowed)
+ 
+   const load = useCallback(async () => {
+     if (!matchId) return;
+@@ -132,6 +136,8 @@ export default function Scorer() {
+     setIsWicket(false);
+     setWicketType("Bowled");
+     setPendingOutPlayerId(null);
++    setFielderId("");
++    setAssistIds([]);
+   };
+ 
+   const exit = () => navigate(-1);
+@@ -213,8 +219,45 @@ export default function Scorer() {
+   if (innings.isComplete) {
+     if (state.currentInningsIndex === 0 && !sb.innings2) {
+       return (
+-        <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle={`1st innings over: ${innings.totalRuns}/${innings.totalWickets}`} onExit={exit}>
+-          <InningsSetupPanel sb={sb} inningsNo={2} onDone={load} />
++        <Shell matchId={sb.matchId} canManage={access?.canManage} title="Scorer" subtitle="1st innings completed" onExit={exit}>
++          {startedSecond ? (
++            <InningsSetupPanel sb={sb} inningsNo={2} onDone={load} />
++          ) : (
++            <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl text-center space-y-4">
++              <p className="text-xs font-bold tracking-wide text-foreground/60">INNINGS 1 COMPLETED</p>
++              <p className="text-3xl font-extrabold text-foreground">
++                {innings.battingTeam} {innings.totalRuns}/{innings.totalWickets}
++              </p>
++              <p className="text-foreground/70">
++                in {innings.totalOvers}.{innings.ballsInCurrentOver} overs
++              </p>
++              <p className="rounded-xl bg-accent/20 px-4 py-3 text-sm font-semibold text-foreground">
++                {innings.bowlingTeam} need {innings.totalRuns + 1} runs from {state.maxOvers * 6} balls to win
++              </p>
++              <div className="flex gap-3 justify-center flex-wrap">
++                <button
++                  onClick={() => setStartedSecond(true)}
++                  className="px-6 py-2.5 bg-red-600 text-white rounded-full font-semibold"
++                >
++                  Start 2nd innings
++                </button>
++                <button
++                  onClick={async () => {
++                    if (!matchId) return;
++                    try {
++                      await undoLastBall(matchId, 1);
++                      await load();
++                    } catch (e) {
++                      toast({ title: "Could not undo", variant: "destructive", description: (e as Error).message });
++                    }
++                  }}
++                  className="px-6 py-2.5 bg-background/60 text-foreground rounded-full font-semibold"
++                >
++                  Undo last ball
++                </button>
++              </div>
++            </div>
++          )}
+         </Shell>
+       );
+     }
+@@ -225,6 +268,7 @@ export default function Scorer() {
+             {innings.battingTeam}: {innings.totalRuns}/{innings.totalWickets} in {innings.totalOvers}.
+             {innings.ballsInCurrentOver} overs
+           </p>
++          {describeResult(state) && <p className="text-lg font-bold text-foreground">{describeResult(state)}</p>}
+           <div className="flex gap-3 justify-center">
+             <button
+               onClick={async () => {
+@@ -270,6 +314,11 @@ export default function Scorer() {
+     .filter((id) => !innings.battingOrder.includes(id))
+     .map((id) => ({ id, name: nameOf(id) }));
+   const availableBowlers = bowlingSquad.map((id) => ({ id, name: nameOf(id) }));
++  // who can take a catch / stumping / run-out: the fielding team's playing XI
++  const fielders = bowlingSquad.map((id) => ({ id, name: nameOf(id) }));
++  const needsFielder = isWicket && (wicketType === "Caught" || wicketType === "Stumped" || wicketType === "Run Out");
++  const fielderLabel =
++    wicketType === "Caught" ? "Caught by" : wicketType === "Stumped" ? "Stumped by (wicketkeeper)" : "Run out by";
+ 
+   // Save one ball on the server, then reload (the reload replays all balls)
+   const submitBall = async (newBatsman?: { id: string; name: string }) => {
+@@ -283,6 +332,10 @@ export default function Scorer() {
+         isWicket,
+         wicketType: isWicket ? wicketType : undefined,
+         outPlayerId: isWicket ? pendingOutPlayerId ?? undefined : undefined,
++        fielderId: needsFielder ? fielderId : undefined,
++        fielderName: needsFielder && fielderId ? nameOf(fielderId) : undefined,
++        assistIds: needsFielder && wicketType === "Run Out" ? assistIds : undefined,
++        assistNames: needsFielder && wicketType === "Run Out" ? assistIds.map(nameOf) : undefined,
+         newBatsmanId: newBatsman?.id,
+         newBatsmanName: newBatsman?.name,
+       },
+@@ -310,6 +363,10 @@ export default function Scorer() {
+       toast({ title: "Select who's out", variant: "destructive", description: "Choose the dismissed batter first." });
+       return;
+     }
++    if (needsFielder && !fielderId) {
++      toast({ title: `Select who: ${fielderLabel}`, variant: "destructive", description: "The fielder is needed for the MVP points." });
++      return;
++    }
+     // a wicket needs the next batsman first, and the ball is saved ONCE when he is picked
+     // (even when only ONE batter is left to come in; no picker only when this wicket ends the innings)
+     if (isWicket && innings.totalWickets + 1 < (innings.maxWickets ?? 10) && availableBatsmen.length > 0) {
+@@ -566,7 +623,11 @@ export default function Scorer() {
+                   {WICKET_TYPES.map((wt) => (
+                     <button
+                       key={wt}
+-                      onClick={() => setWicketType(wt)}
++                      onClick={() => {
++                        setWicketType(wt);
++                        setFielderId("");
++                        setAssistIds([]);
++                      }}
+                       className={`py-2 rounded-xl text-xs font-semibold transition-colors ${
+                         wicketType === wt ? "bg-accent text-accent-foreground" : "bg-background/60 text-foreground/80"
+                       }`}
+@@ -575,6 +636,53 @@ export default function Scorer() {
+                     </button>
+                   ))}
+                 </div>
++
++                {needsFielder && (
++                  <div className="mt-4">
++                    <p className="text-sm text-foreground/70 mb-2">{fielderLabel}</p>
++                    <div className="flex flex-wrap gap-2">
++                      {fielders.map((p) => (
++                        <button
++                          key={p.id}
++                          onClick={() => {
++                            setFielderId(p.id);
++                            setAssistIds((list) => list.filter((x) => x !== p.id));
++                          }}
++                          className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
++                            fielderId === p.id ? "bg-red-600 text-white" : "bg-background/60 text-foreground/80"
++                          }`}
++                        >
++                          {p.name}
++                        </button>
++                      ))}
++                    </div>
++
++                    {wicketType === "Run Out" && (
++                      <>
++                        <p className="text-sm text-foreground/70 mt-4 mb-2">Also helped in the run-out (pick all who did)</p>
++                        <div className="flex flex-wrap gap-2">
++                          {fielders
++                            .filter((p) => p.id !== fielderId)
++                            .map((p) => (
++                              <button
++                                key={p.id}
++                                onClick={() =>
++                                  setAssistIds((list) =>
++                                    list.includes(p.id) ? list.filter((x) => x !== p.id) : [...list, p.id]
++                                  )
++                                }
++                                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
++                                  assistIds.includes(p.id) ? "bg-accent text-accent-foreground" : "bg-background/60 text-foreground/80"
++                                }`}
++                              >
++                                {p.name}
++                              </button>
++                            ))}
++                        </div>
++                      </>
++                    )}
++                  </div>
++                )}
+               </motion.div>
+             )}
+           </AnimatePresence>
+diff --git a/Frontend/CricLively/src/components/data/MatchScoringTypes.ts b/Frontend/CricLively/src/components/data/MatchScoringTypes.ts
+index dfccedd..f6dd445 100644
+--- a/Frontend/CricLively/src/components/data/MatchScoringTypes.ts
++++ b/Frontend/CricLively/src/components/data/MatchScoringTypes.ts
+@@ -28,6 +28,10 @@ export interface BallEvent {
+   isWicket: boolean;
+   wicketType?: WicketType;
+   outPlayerId?: string;
++  fielderId?: string; // caught by / wicketkeeper (stumped) / run out by
++  fielderName?: string;
++  assistIds?: string[]; // run-out: everybody who helped
++  assistNames?: string[];
+   strikerId: string;
+   nonStrikerId: string;
+   bowlerId: string;
+diff --git a/Frontend/CricLively/src/components/data/scoringReducer.ts b/Frontend/CricLively/src/components/data/scoringReducer.ts
+index f94ef45..2b6d2c8 100644
+--- a/Frontend/CricLively/src/components/data/scoringReducer.ts
++++ b/Frontend/CricLively/src/components/data/scoringReducer.ts
+@@ -21,6 +21,10 @@ export type ScoringAction =
+         isWicket: boolean;
+         wicketType?: WicketType;
+         outPlayerId?: string;
++        fielderId?: string;
++        fielderName?: string;
++        assistIds?: string[];
++        assistNames?: string[];
+         newBatsmanId?: string; // required if isWicket and innings continues
+         newBatsmanName?: string;
+       };
+@@ -97,11 +101,18 @@ function applyBallToInnings(
+       outBatsman.isOnStrike = false;
+       outBatsman.dismissal =
+         ball.wicketType === "Caught"
+-          ? `c & b ${bowler?.name ?? ""}`.trim()
++          ? (!ball.fielderId || ball.fielderId === ball.bowlerId
++              ? `c & b ${bowler?.name ?? ""}`
++              : `c ${ball.fielderName ?? ""} b ${bowler?.name ?? ""}`
++            ).trim()
++          : ball.wicketType === "Stumped"
++          ? `st ${ball.fielderName ?? ""} b ${bowler?.name ?? ""}`.replace("  ", " ").trim()
+           : ball.wicketType === "Bowled"
+           ? `b ${bowler?.name ?? ""}`
+           : ball.wicketType === "Run Out"
+-          ? "run out"
++          ? ball.fielderName
++            ? `run out (${[ball.fielderName, ...(ball.assistNames ?? [])].join(" / ")})`
++            : "run out"
+           : ball.wicketType ?? "out";
+     }
+   }
+@@ -143,8 +154,10 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
+ 
+   switch (action.type) {
+     case "RECORD_BALL": {
+-      const { runs, extraType, extraRuns, isWicket, wicketType, outPlayerId, newBatsmanId, newBatsmanName } =
+-        action.payload;
++      const {
++        runs, extraType, extraRuns, isWicket, wicketType, outPlayerId, newBatsmanId, newBatsmanName,
++        fielderId, fielderName, assistIds, assistNames,
++      } = action.payload;
+       const legal = isLegalDelivery(extraType);
+ 
+       const updatedInnings = applyBallToInnings(currentInnings, {
+@@ -154,6 +167,10 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
+         isWicket,
+         wicketType,
+         outPlayerId,
++        fielderId,
++        fielderName,
++        assistIds,
++        assistNames,
+         strikerId: currentInnings.strikerId,
+         nonStrikerId: currentInnings.nonStrikerId,
+         bowlerId: currentInnings.currentBowlerId,
+@@ -171,6 +188,10 @@ export function scoringReducer(state: MatchScoreState, action: ScoringAction): M
+         isWicket,
+         wicketType,
+         outPlayerId,
++        fielderId,
++        fielderName,
++        assistIds,
++        assistNames,
+         strikerId: currentInnings.strikerId,
+         nonStrikerId: currentInnings.nonStrikerId,
+         bowlerId: currentInnings.currentBowlerId,
+diff --git a/Frontend/CricLively/src/components/viewer.tsx b/Frontend/CricLively/src/components/viewer.tsx
+index be22a98..8fe6de3 100644
+--- a/Frontend/CricLively/src/components/viewer.tsx
++++ b/Frontend/CricLively/src/components/viewer.tsx
+@@ -7,6 +7,8 @@ import { buildScoreState } from "../lib/scoreAdapter";
+ import { useLiveUpdates } from "../lib/useLiveUpdates";
+ import type { MatchScoreState } from "./data/MatchScoringTypes";
+ import Navbar from "./Navbar";
++import { describeResult } from "../lib/matchResult";
++import type { InningsState } from "./data/MatchScoringTypes";
+ 
+ export default function ViewerPage() {
+   const navigate = useNavigate();
+@@ -76,18 +78,10 @@ export default function ViewerPage() {
+   }
+ 
+   const innings = state.innings[state.currentInningsIndex];
+-  const firstInnings = state.innings[0];
+-  const secondInnings = state.innings[1];
+-  let resultText: string | null = null;
+-  if (state.status === "FINISHED" && secondInnings) {
+-    if (secondInnings.totalRuns > firstInnings.totalRuns) {
+-      resultText = `${secondInnings.battingTeam} won by ${Math.max((secondInnings.maxWickets ?? 10) - secondInnings.totalWickets, 0)} wickets`;
+-    } else if (secondInnings.totalRuns < firstInnings.totalRuns) {
+-      resultText = `${firstInnings.battingTeam} won by ${firstInnings.totalRuns - secondInnings.totalRuns} runs`;
+-    } else {
+-      resultText = "Match tied";
+-    }
+-  }
++  const resultText = describeResult(state);
++  const live = state.status === "LIVE";
++  // the chase banner only makes sense while the 2nd innings is still being played
++  const chasing = !!innings.target && !innings.isComplete && live;
+   const overDisplay = `${innings.totalOvers}.${innings.ballsInCurrentOver}`;
+   const striker = innings.batsmen[innings.strikerId];
+   const nonStriker = innings.batsmen[innings.nonStrikerId];
+@@ -99,12 +93,10 @@ export default function ViewerPage() {
+     ? (innings.totalRuns / (innings.totalOvers + innings.ballsInCurrentOver / 6)).toFixed(2)
+     : "0.00";
+ 
+-  let requiredRunRate: string | null = null;
+-  if (innings.target) {
+-    const oversLeft = state.maxOvers - innings.totalOvers - innings.ballsInCurrentOver / 6;
+-    const runsNeeded = innings.target - innings.totalRuns;
+-    requiredRunRate = oversLeft > 0 ? (runsNeeded / oversLeft).toFixed(2) : "—";
+-  }
++  const ballsLeft = Math.max(state.maxOvers * 6 - (innings.totalOvers * 6 + innings.ballsInCurrentOver), 0);
++  const runsNeeded = innings.target ? Math.max(innings.target - innings.totalRuns, 0) : 0;
++  const requiredRunRate: string | null =
++    chasing && ballsLeft > 0 ? (runsNeeded / (ballsLeft / 6)).toFixed(2) : null;
+ 
+   return (
+     <>
+@@ -119,8 +111,12 @@ export default function ViewerPage() {
+           transition={{ duration: 0.6 }}
+         >
+           <div>
+-            <span className="inline-flex items-center gap-2 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
+-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
++            <span
++              className={`inline-flex items-center gap-2 text-white text-xs font-bold px-3 py-1 rounded-full mb-2 ${
++                live ? "bg-red-600" : "bg-green-700"
++              }`}
++            >
++              {live && <span className="w-2 h-2 rounded-full bg-white animate-pulse" />}
+               {state.status}
+             </span>
+             <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
+@@ -164,17 +160,27 @@ export default function ViewerPage() {
+             </div>
+           )}
+ 
+-          {innings.target && (
++          {chasing && (
+             <div className="rounded-xl bg-accent/20 px-4 py-3 mb-4">
+               <p className="text-sm font-semibold text-foreground">
+-                Target: {innings.target} · Need {Math.max(innings.target - innings.totalRuns, 0)} runs
+-                {state.maxOvers - innings.totalOvers > 0
+-                  ? ` from ${Math.max((state.maxOvers - innings.totalOvers) * 6 - innings.ballsInCurrentOver, 0)} balls`
+-                  : ""}
++                Target: {innings.target} · Need {runsNeeded} runs from {ballsLeft} balls
+               </p>
+             </div>
+           )}
+ 
++          {state.innings.length === 2 && (
++            <div className="rounded-xl bg-background/60 px-4 py-3 mb-4 text-sm text-foreground space-y-1">
++              {state.innings.map((inn, i) => (
++                <div key={i} className="flex justify-between">
++                  <span className="font-semibold">{inn.battingTeam}</span>
++                  <span>
++                    {inn.totalRuns}/{inn.totalWickets} ({inn.totalOvers}.{inn.ballsInCurrentOver})
++                  </span>
++                </div>
++              ))}
++            </div>
++          )}
++
+           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+             <StatTile label="Run Rate" value={runRate} />
+             {requiredRunRate && <StatTile label="Req. Run Rate" value={requiredRunRate} />}
+@@ -219,77 +225,9 @@ export default function ViewerPage() {
+               transition={{ duration: 0.3 }}
+               className="bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl"
+             >
+-              <h2 className="text-lg font-bold text-foreground mb-4">Batting — {innings.battingTeam}</h2>
+-              <div className="overflow-x-auto">
+-                <table className="w-full text-sm">
+-                  <thead>
+-                    <tr className="text-foreground/50 text-left border-b border-foreground/10">
+-                      <th className="py-2 pr-4 font-semibold">Batter</th>
+-                      <th className="py-2 px-2 font-semibold text-right">R</th>
+-                      <th className="py-2 px-2 font-semibold text-right">B</th>
+-                      <th className="py-2 px-2 font-semibold text-right">4s</th>
+-                      <th className="py-2 px-2 font-semibold text-right">6s</th>
+-                      <th className="py-2 pl-2 font-semibold text-right">SR</th>
+-                    </tr>
+-                  </thead>
+-                  <tbody>
+-                    {innings.battingOrder.map((pid) => {
+-                      const b = innings.batsmen[pid];
+-                      if (!b) return null;
+-                      const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "0.0";
+-                      return (
+-                        <tr key={pid} className="border-b border-foreground/5 last:border-0">
+-                          <td className="py-2.5 pr-4 font-medium text-foreground">
+-                            {b.name}
+-                            {b.isOnStrike && <span className="text-accent ml-1">*</span>}
+-                            {b.isOut && <p className="text-xs text-foreground/50">{b.dismissal}</p>}
+-                            {!b.isOut && !b.isOnStrike && pid !== innings.strikerId && pid !== innings.nonStrikerId && (
+-                              <p className="text-xs text-foreground/50">not out</p>
+-                            )}
+-                          </td>
+-                          <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.runs}</td>
+-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.balls}</td>
+-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.fours}</td>
+-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.sixes}</td>
+-                          <td className="py-2.5 pl-2 text-right text-foreground/70">{sr}</td>
+-                        </tr>
+-                      );
+-                    })}
+-                  </tbody>
+-                </table>
+-              </div>
+-
+-              <h2 className="text-lg font-bold text-foreground mt-6 mb-4">Bowling — {innings.bowlingTeam}</h2>
+-              <div className="overflow-x-auto">
+-                <table className="w-full text-sm">
+-                  <thead>
+-                    <tr className="text-foreground/50 text-left border-b border-foreground/10">
+-                      <th className="py-2 pr-4 font-semibold">Bowler</th>
+-                      <th className="py-2 px-2 font-semibold text-right">O</th>
+-                      <th className="py-2 px-2 font-semibold text-right">R</th>
+-                      <th className="py-2 px-2 font-semibold text-right">W</th>
+-                      <th className="py-2 pl-2 font-semibold text-right">Econ</th>
+-                    </tr>
+-                  </thead>
+-                  <tbody>
+-                    {Object.values(innings.bowlers).map((b) => {
+-                      const totalOversFloat = Math.floor(b.overs) + b.ballsThisOver / 6;
+-                      const econ = totalOversFloat > 0 ? (b.runsConceded / totalOversFloat).toFixed(2) : "0.00";
+-                      return (
+-                        <tr key={b.playerId} className="border-b border-foreground/5 last:border-0">
+-                          <td className="py-2.5 pr-4 font-medium text-foreground">{b.name}</td>
+-                          <td className="py-2.5 px-2 text-right text-foreground/70">
+-                            {Math.floor(b.overs)}.{b.ballsThisOver}
+-                          </td>
+-                          <td className="py-2.5 px-2 text-right text-foreground/70">{b.runsConceded}</td>
+-                          <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.wickets}</td>
+-                          <td className="py-2.5 pl-2 text-right text-foreground/70">{econ}</td>
+-                        </tr>
+-                      );
+-                    })}
+-                  </tbody>
+-                </table>
+-              </div>
++              {state.innings.map((inn, i) => (
++                <InningsScorecard key={i} inn={inn} title={`${i === 0 ? "1st" : "2nd"} innings`} live={live && !inn.isComplete} />
++              ))}
+             </motion.div>
+           ) : (
+             <motion.div
+@@ -344,16 +282,6 @@ export default function ViewerPage() {
+           )}
+         </AnimatePresence>
+ 
+-        {firstInnings && state.currentInningsIndex === 1 && (
+-          <motion.div
+-            className="mt-6 bg-card/60 backdrop-blur-xl rounded-2xl p-4 text-sm text-foreground/70"
+-            initial={{ opacity: 0 }}
+-            animate={{ opacity: 1 }}
+-          >
+-            1st Innings: {firstInnings.battingTeam} scored {firstInnings.totalRuns}/{firstInnings.totalWickets} in{" "}
+-            {firstInnings.totalOvers}.{firstInnings.ballsInCurrentOver} overs
+-          </motion.div>
+-        )}
+       </div>
+     </section>
+     </>
+@@ -400,4 +328,91 @@ function BatsmanCard({
+       </p>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
++function InningsScorecard({ inn, title, live }: { inn: InningsState; title: string; live: boolean }) {
++  return (
++    <div className="mb-8 last:mb-0">
++      <div className="flex items-baseline justify-between mb-4">
++        <h2 className="text-lg font-bold text-foreground">
++          {title} · {inn.battingTeam}
++        </h2>
++        <p className="text-sm font-semibold text-foreground/70">
++          {inn.totalRuns}/{inn.totalWickets} ({inn.totalOvers}.{inn.ballsInCurrentOver})
++        </p>
++      </div>
++
++      <div className="overflow-x-auto">
++        <table className="w-full text-sm">
++          <thead>
++            <tr className="text-foreground/50 text-left border-b border-foreground/10">
++              <th className="py-2 pr-4 font-semibold">Batter</th>
++              <th className="py-2 px-2 font-semibold text-right">R</th>
++              <th className="py-2 px-2 font-semibold text-right">B</th>
++              <th className="py-2 px-2 font-semibold text-right">4s</th>
++              <th className="py-2 px-2 font-semibold text-right">6s</th>
++              <th className="py-2 pl-2 font-semibold text-right">SR</th>
++            </tr>
++          </thead>
++          <tbody>
++            {inn.battingOrder.map((pid) => {
++              const b = inn.batsmen[pid];
++              if (!b) return null;
++              const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(1) : "0.0";
++              const atCrease = pid === inn.strikerId || pid === inn.nonStrikerId;
++              return (
++                <tr key={pid} className="border-b border-foreground/5 last:border-0">
++                  <td className="py-2.5 pr-4 font-medium text-foreground">
++                    {b.name}
++                    {live && b.isOnStrike && <span className="text-accent ml-1">*</span>}
++                    {b.isOut ? (
++                      <p className="text-xs text-foreground/50">{b.dismissal}</p>
++                    ) : (
++                      <p className="text-xs text-foreground/50">{live && !atCrease ? "" : live ? "batting" : "not out"}</p>
++                    )}
++                  </td>
++                  <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.runs}</td>
++                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.balls}</td>
++                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.fours}</td>
++                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.sixes}</td>
++                  <td className="py-2.5 pl-2 text-right text-foreground/70">{sr}</td>
++                </tr>
++              );
++            })}
++          </tbody>
++        </table>
++      </div>
++
++      <h3 className="text-sm font-bold text-foreground mt-5 mb-3">Bowling · {inn.bowlingTeam}</h3>
++      <div className="overflow-x-auto">
++        <table className="w-full text-sm">
++          <thead>
++            <tr className="text-foreground/50 text-left border-b border-foreground/10">
++              <th className="py-2 pr-4 font-semibold">Bowler</th>
++              <th className="py-2 px-2 font-semibold text-right">O</th>
++              <th className="py-2 px-2 font-semibold text-right">R</th>
++              <th className="py-2 px-2 font-semibold text-right">W</th>
++              <th className="py-2 pl-2 font-semibold text-right">Econ</th>
++            </tr>
++          </thead>
++          <tbody>
++            {Object.values(inn.bowlers).map((b) => {
++              const oversFloat = Math.floor(b.overs) + b.ballsThisOver / 6;
++              const econ = oversFloat > 0 ? (b.runsConceded / oversFloat).toFixed(2) : "0.00";
++              return (
++                <tr key={b.playerId} className="border-b border-foreground/5 last:border-0">
++                  <td className="py-2.5 pr-4 font-medium text-foreground">{b.name}</td>
++                  <td className="py-2.5 px-2 text-right text-foreground/70">
++                    {Math.floor(b.overs)}.{b.ballsThisOver}
++                  </td>
++                  <td className="py-2.5 px-2 text-right text-foreground/70">{b.runsConceded}</td>
++                  <td className="py-2.5 px-2 text-right font-semibold text-foreground">{b.wickets}</td>
++                  <td className="py-2.5 pl-2 text-right text-foreground/70">{econ}</td>
++                </tr>
++              );
++            })}
++          </tbody>
++        </table>
++      </div>
++    </div>
++  );
++}
+diff --git a/Frontend/CricLively/src/lib/matchResult.ts b/Frontend/CricLively/src/lib/matchResult.ts
+new file mode 100644
+index 0000000..80aa20c
+--- /dev/null
++++ b/Frontend/CricLively/src/lib/matchResult.ts
+@@ -0,0 +1,19 @@
++import type { MatchScoreState } from "../components/data/MatchScoringTypes";
++
++const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
++
++/** "India won by 5 runs": once the 2nd innings is over (or the match is finished). */
++export function describeResult(state: MatchScoreState): string | null {
++  const [first, second] = state.innings;
++  if (!first || !second) return null;
++  if (state.status !== "FINISHED" && !second.isComplete) return null;
++
++  if (second.totalRuns > first.totalRuns) {
++    const left = Math.max((second.maxWickets ?? 10) - second.totalWickets, 0);
++    return `${second.battingTeam} won by ${plural(left, "wicket")}`;
++  }
++  if (second.totalRuns < first.totalRuns) {
++    return `${first.battingTeam} won by ${plural(first.totalRuns - second.totalRuns, "run")}`;
++  }
++  return "Match tied";
++}
+diff --git a/Frontend/CricLively/src/lib/scoreAdapter.ts b/Frontend/CricLively/src/lib/scoreAdapter.ts
+index 0b418fa..c9514cc 100644
+--- a/Frontend/CricLively/src/lib/scoreAdapter.ts
++++ b/Frontend/CricLively/src/lib/scoreAdapter.ts
+@@ -63,6 +63,8 @@ export function toApiBall(inningsNo: 1 | 2, b: BallEvent, newBatsmanId?: string)
+           playerOutId: b.outPlayerId ?? null,
+           outType: WICKET_TO_API[b.wicketType ?? "Bowled"],
+           bowlerId: b.wicketType === "Run Out" ? null : b.bowlerId,
++          fielderId: b.fielderId ?? null,
++          assistFielderIds: b.assistIds ?? [],
+           isBowlerCredit: b.wicketType !== "Run Out" && b.wicketType !== "Retired Hurt",
+         }
+       : null,
+@@ -134,6 +136,10 @@ function buildInnings(
+         isWicket: !!b.wicket,
+         wicketType: b.wicket ? WICKET_FROM_API[b.wicket.outType] ?? "Bowled" : undefined,
+         outPlayerId: b.wicket?.playerOutId ?? undefined,
++        fielderId: b.wicket?.fielderId ?? undefined,
++        fielderName: b.wicket?.fielderId ? name(b.wicket.fielderId) : undefined,
++        assistIds: b.wicket?.assistFielderIds ?? undefined,
++        assistNames: (b.wicket?.assistFielderIds ?? []).map((id) => name(id)),
+         newBatsmanId: b.newBatsmanId ?? undefined,
+         newBatsmanName: b.newBatsmanId ? name(b.newBatsmanId) : undefined,
+       },

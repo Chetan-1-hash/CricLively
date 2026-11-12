@@ -8,6 +8,8 @@ export interface ApiWicket {
   playerOutId: string | null;
   outType: string; // BOWLED, CAUGHT, LBW, RUNOUT, STUMPED, HITWICKET, RETIRED_HURT
   bowlerId: string | null;
+  fielderId?: string | null; // caught by / stumped by / run out by
+  assistFielderIds?: string[]; // run-out helpers
   isBowlerCredit: boolean;
 }
 

@@ -27,5 +27,7 @@ public class Wicket {
     private String fielderId;     // The player who took the catch or performed the run-out
     private String assistantFielderId; // Optional: For combined run-outs (e.g., relay throw)
 
+    private java.util.List<String> assistFielderIds; // run-out: everybody who helped (can be several)
+
     private Boolean isBowlerCredit; // True for Bowled, Caught, LBW; False for Run Out
 }
