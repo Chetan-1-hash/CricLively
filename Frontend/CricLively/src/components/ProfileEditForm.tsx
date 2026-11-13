@@ -53,6 +53,7 @@ export default function ProfileEditForm({ mode }: { mode: "self" | "admin" }) {
     middleName: "",
     lastName: "",
     dob: "",
+    email: "",
     mobileNumber: "",
   });
   const [batting, setBatting] = useState("");
@@ -73,6 +74,7 @@ export default function ProfileEditForm({ mode }: { mode: "self" | "admin" }) {
           middleName: p.middleName ?? "",
           lastName: p.lastName ?? "",
           dob: p.dob ?? "",
+          email: p.email ?? "",
           mobileNumber: p.mobileNumber ?? "",
         });
         setBatting(p.battingStyle ?? "");
@@ -101,6 +103,11 @@ export default function ProfileEditForm({ mode }: { mode: "self" | "admin" }) {
 
     if (hasPlayer && !info.firstName.trim()) {
       toast({ title: "First name is required", variant: "destructive" });
+      return;
+    }
+    const emailTrimmed = info.email.trim();
+    if (!emailTrimmed || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrimmed)) {
+      toast({ title: "Please enter a valid email address", variant: "destructive" });
       return;
     }
     if (!info.mobileNumber.trim()) {
@@ -214,6 +221,22 @@ export default function ProfileEditForm({ mode }: { mode: "self" | "admin" }) {
                   </Field>
                 </>
               )}
+
+              <Field label="Email address">
+                <input
+                  type="email"
+                  className={inputCls}
+                  value={info.email}
+                  onChange={set("email")}
+                  placeholder="you@example.com"
+                />
+                {profile.emailVerified &&
+                  info.email.trim().toLowerCase() !== (profile.email ?? "").trim().toLowerCase() && (
+                    <p className="text-xs text-amber-300 mt-1">
+                      Changing email will reset verification status for the new address.
+                    </p>
+                  )}
+              </Field>
 
               <Field label="Mobile number">
                 <input className={inputCls} value={info.mobileNumber} onChange={set("mobileNumber")} />

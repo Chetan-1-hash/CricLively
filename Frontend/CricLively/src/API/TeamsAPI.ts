@@ -9,7 +9,14 @@ export async function TeamsListAPI(): Promise<TeamsList[]> {
 
     if(!resp.ok){
         const text = await resp.text();
-        throw new Error(text || "Failed to fetch!");
+        let message = text || "Failed to create team!";
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed?.message) message = parsed.message;
+        } catch {
+            // keep text fallback
+        }
+        throw new Error(message);
     }
 
     return await resp.json();
@@ -40,7 +47,14 @@ export async function addTeamAPI(team:Team) {
 
     if(!resp.ok){
         const text = await resp.text();
-        throw new Error(text || "Failed to fetch!");
+        let message = text || "Failed to create team!";
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed?.message) message = parsed.message;
+        } catch {
+            // keep text fallback
+        }
+        throw new Error(message);
     }
 
     return await resp.json();

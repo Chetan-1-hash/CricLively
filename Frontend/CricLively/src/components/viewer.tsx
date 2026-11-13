@@ -8,6 +8,7 @@ import { useLiveUpdates } from "../lib/useLiveUpdates";
 import type { MatchScoreState } from "./data/MatchScoringTypes";
 import Navbar from "./Navbar";
 import { PageSpinner } from "./Spinner";
+import MatchAwards from "./MatchAwards";
 import BallCelebration, { type Celebration } from "./BallCelebration";
 import type { ScoreboardResponse } from "../API/ScoringAPI";
 import { describeResult } from "../lib/matchResult";
@@ -118,6 +119,9 @@ export default function ViewerPage() {
   const nonStriker = innings.batsmen[innings.nonStrikerId];
   const bowler = innings.bowlers[innings.currentBowlerId];
 
+  // striker / bowler / batting pair only make sense while the ball is being bowled
+  const showLivePlayers = live && !innings.isComplete;
+
   const recentBalls = innings.balls.slice(-12).reverse();
 
   const runRate = innings.totalOvers > 0 || innings.ballsInCurrentOver > 0
@@ -134,7 +138,7 @@ export default function ViewerPage() {
     <BallCelebration event={celebration} onDone={endCelebration} />
       <Navbar />
       <section className="min-h-[100vh] relative py-12 bg-background/80">
-      <div className="container my-8 mx-auto px-6 relative max-w-4xl">
+      <div className="container my-8 mx-auto px-4 sm:px-6 relative max-w-4xl">
         {/* Header */}
         <motion.div
           className="flex justify-between items-center mb-6 gap-4"
@@ -151,7 +155,7 @@ export default function ViewerPage() {
               {live && <span className="w-2 h-2 rounded-full bg-white animate-pulse" />}
               {state.status}
             </span>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-foreground">
               {state.teamAName} <span className="text-foreground/50">vs</span> {state.teamBName}
             </h1>
           </div>
@@ -165,7 +169,7 @@ export default function ViewerPage() {
 
         {/* Score hero card */}
         <motion.div
-          className="bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl mb-6"
+          className="bg-card/80 backdrop-blur-xl rounded-3xl p-5 sm:p-5 sm:p-8 shadow-2xl mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -216,12 +220,19 @@ export default function ViewerPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatTile label="Run Rate" value={runRate} />
             {requiredRunRate && <StatTile label="Req. Run Rate" value={requiredRunRate} />}
-            <StatTile label="Striker" value={`${striker?.name ?? "—"}`} sub={striker ? `${striker.runs} (${striker.balls})` : ""} />
-            <StatTile label="Bowler" value={`${bowler?.name ?? "—"}`} sub={bowler ? `${bowler.wickets}/${bowler.runsConceded}` : ""} />
+            {showLivePlayers && (
+              <>
+                <StatTile label="Striker" value={`${striker?.name ?? "—"}`} sub={striker ? `${striker.runs} (${striker.balls})` : ""} />
+                <StatTile label="Bowler" value={`${bowler?.name ?? "—"}`} sub={bowler ? `${bowler.wickets}/${bowler.runsConceded}` : ""} />
+              </>
+            )}
           </div>
         </motion.div>
 
-        {/* Batting pair */}
+        <MatchAwards state={state} />
+
+        {/* Batting pair (only while the innings is on) */}
+        {showLivePlayers && (
         <motion.div
           className="grid sm:grid-cols-2 gap-4 mb-6"
           initial={{ opacity: 0, y: 20 }}
@@ -231,6 +242,7 @@ export default function ViewerPage() {
           <BatsmanCard name={striker?.name} runs={striker?.runs} balls={striker?.balls} fours={striker?.fours} sixes={striker?.sixes} onStrike />
           <BatsmanCard name={nonStriker?.name} runs={nonStriker?.runs} balls={nonStriker?.balls} fours={nonStriker?.fours} sixes={nonStriker?.sixes} />
         </motion.div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-4">
@@ -362,16 +374,28 @@ function BatsmanCard({
   );
 }
 function InningsScorecard({ inn, title, live }: { inn: InningsState; title: string; live: boolean }) {
+  const [open, setOpen] = useState(true); // click the bar to hide / show the tables
   return (
-    <div className="mb-8 last:mb-0">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-lg font-bold text-foreground">
+    <div className="mb-6 last:mb-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 rounded-xl bg-background/50 hover:bg-background/70 transition-colors px-4 py-3 text-left"
+      >
+        <h2 className="text-base sm:text-lg font-bold text-foreground">
           {title} · {inn.battingTeam}
         </h2>
-        <p className="text-sm font-semibold text-foreground/70">
-          {inn.totalRuns}/{inn.totalWickets} ({inn.totalOvers}.{inn.ballsInCurrentOver})
-        </p>
-      </div>
+        <span className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-sm font-semibold text-foreground/70">
+            {inn.totalRuns}/{inn.totalWickets} ({inn.totalOvers}.{inn.ballsInCurrentOver})
+          </span>
+          <span className={`text-foreground/60 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        </span>
+      </button>
+
+      {open && (
+      <div className="mt-4">
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -445,6 +469,8 @@ function InningsScorecard({ inn, title, live }: { inn: InningsState; title: stri
           </tbody>
         </table>
       </div>
+      </div>
+      )}
     </div>
   );
 }

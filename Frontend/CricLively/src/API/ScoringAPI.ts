@@ -66,6 +66,8 @@ export interface ScoreboardResponse {
   playingA: string[]; // who plays today
   playingB: string[];
   playerNames: Record<string, string>;
+  playerVerified?: Record<string, boolean>;
+  playerMatchesPlayed?: Record<string, number>;
   toss: ApiToss | null;
   innings1: ApiInnings | null;
   innings2: ApiInnings | null;

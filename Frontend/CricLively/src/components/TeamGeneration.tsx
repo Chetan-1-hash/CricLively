@@ -132,7 +132,7 @@ export default function TeamGeneration() {
       <Navbar />
       <section className="min-h-[100vh] pt-28 pb-12 px-4 flex flex-col items-center">
         <motion.h1
-          className="text-4xl md:text-5xl font-extrabold text-foreground mb-8"
+          className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >

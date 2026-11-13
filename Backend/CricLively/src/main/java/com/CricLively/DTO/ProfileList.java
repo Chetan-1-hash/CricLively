@@ -11,9 +11,12 @@ import java.util.Set;
 @Data
 public class ProfileList {
     private String id;
+    private String email;
     private String mobileNumber;
     private String firstName;
     private String middleName;
     private String lastName;
     private Set<Role> role;
+    private boolean emailVerified;
+    private int matchesPlayed;
 }

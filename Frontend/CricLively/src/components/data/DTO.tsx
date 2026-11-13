@@ -51,13 +51,29 @@ export class PlayerCricketDetailsRequest {
   }
 }
 
+export interface AddPlayerProfileRequest {
+  firstName: string;
+  middleName?: string;
+  lastName?: string;
+  dob?: string;
+  email: string;
+  mobileNumber: string;
+  password?: string;
+  battingStyle?: BattingStyle;
+  bowlingStyle?: BowlingStyle;
+  playingRole?: PlayingRole;
+}
+
 export class ProfileList {
   id!: string;
+  email?: string;
   mobileNumber!: string;
   firstName!: string;
   middleName?: string;
   lastName!: string;
   role?: string[]; // PLAYER, ORGANIZER
+  emailVerified?: boolean;
+  matchesPlayed?: number;
 
   constructor(init?: Partial<ProfileList>) {
     Object.assign(this, init);

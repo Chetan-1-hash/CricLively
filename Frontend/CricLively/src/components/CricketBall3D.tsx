@@ -60,7 +60,7 @@ function CricketBall() {
 
 export default function CricketBall3D() {
   return (
-    <div className="w-full h-[500px] md:h-[600px]">
+    <div className="w-full h-[320px] sm:h-[500px] md:h-[600px]">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 45 }}
         shadows

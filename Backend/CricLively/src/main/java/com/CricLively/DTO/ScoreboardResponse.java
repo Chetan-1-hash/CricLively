@@ -35,6 +35,8 @@ public class ScoreboardResponse {
     private List<String> playingA;        // who plays today (picked from the squad)
     private List<String> playingB;
     private Map<String, String> playerNames; // player id -> full name (both squads)
+    private Map<String, Boolean> playerVerified; // profile id -> emailVerified
+    private Map<String, Integer> playerMatchesPlayed; // profile id -> other LIVE/FINISHED matches played
 
     private Toss toss;
     private Innings innings1;

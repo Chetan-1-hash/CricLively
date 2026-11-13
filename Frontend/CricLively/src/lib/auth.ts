@@ -22,6 +22,8 @@ export interface MyProfile {
   organizerRequestStatus?: "PENDING" | "REJECTED" | null;
   organizerRequestReason?: string | null;
   organizerRequestAt?: string | null;
+  emailVerified?: boolean;
+  matchesPlayed?: number;
   message?: string | null;
 }
 

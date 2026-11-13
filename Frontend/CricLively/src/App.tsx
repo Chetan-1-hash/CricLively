@@ -26,6 +26,7 @@ import RequireRole from "./components/RequireRole";
 import GlobalSpinner from "./components/GlobalSpinner";
 import ProfileEditForm from "./components/ProfileEditForm";
 import AdminProfiles from "./components/AdminProfiles";
+import VerifyEmailPage from "./components/VerifyEmailPage";
 import type { Role } from "./lib/auth";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/team-generation" element={<TeamGeneration />} />
 
           {/* ---------- Any logged-in person: player, organizer or admin ---------- */}

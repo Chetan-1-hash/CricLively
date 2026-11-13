@@ -32,4 +32,11 @@ public class Profile {
     private String organizerRequestStatus;   // null | PENDING | REJECTED
     private String organizerRequestReason;
     private LocalDateTime organizerRequestAt;
+
+    // Free email verification
+    private boolean emailVerified = false;
+    private String emailVerificationCode;
+    private LocalDateTime emailVerificationExpiresAt;
+    private LocalDateTime emailVerifiedAt;
+    private LocalDateTime lastVerificationSentAt;
 }

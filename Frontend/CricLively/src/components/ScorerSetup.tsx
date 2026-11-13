@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { startInnings, startToss, type ScoreboardResponse } from "../API/ScoringAPI";
 import { toast } from "../hooks/use-toast";
+import VerificationBadge from "./VerificationBadge";
 
 const selectCls =
   "w-full px-3.5 py-2.5 rounded-xl bg-background/70 border border-border text-sm text-foreground";
@@ -16,7 +17,23 @@ export function TossPanel({ sb, onDone }: { sb: ScoreboardResponse; onDone: () =
   const [decision, setDecision] = useState<"BATTING" | "BOWLING" | "">("");
   const [saving, setSaving] = useState(false);
 
+  const isVerified = (id: string) => sb.playerVerified?.[id] ?? false;
+  const playedCount = (id: string) => sb.playerMatchesPlayed?.[id] ?? 0;
+  const isEligible = (id: string) => isVerified(id) || playedCount(id) < 1;
+
+  const eligibleA = (sb.squadA ?? []).filter(isEligible).length;
+  const eligibleB = (sb.squadB ?? []).filter(isEligible).length;
+  const hasEnoughEligible = eligibleA >= 2 && eligibleB >= 2;
+
   const submit = async () => {
+    if (!hasEnoughEligible) {
+      toast({
+        title: "Email verification required",
+        description: "Each team needs at least 2 verified or eligible players (unverified players who played 1 match must verify email).",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!winnerId || !decision) {
       toast({ title: "Pick the toss winner and the decision", variant: "destructive" });
       return;
@@ -57,9 +74,44 @@ export function TossPanel({ sb, onDone }: { sb: ScoreboardResponse; onDone: () =
         <option value="BOWLING">Bowl first</option>
       </select>
 
+      {/* Player verification status before starting the match */}
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {[
+          { name: sb.teamAName, squad: sb.squadA ?? [], eligible: eligibleA },
+          { name: sb.teamBName, squad: sb.squadB ?? [], eligible: eligibleB },
+        ].map((team) => (
+          <div key={team.name} className="rounded-2xl bg-background/60 p-3 space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span>{team.name}</span>
+              <span className={team.eligible < 2 ? "text-red-400" : "text-foreground/60"}>
+                {team.eligible}/{team.squad.length} eligible
+              </span>
+            </div>
+            <div className="space-y-1">
+              {team.squad.map((id) => (
+                <div key={id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-foreground">{sb.playerNames[id] ?? "Player"}</span>
+                  <VerificationBadge
+                    verified={isVerified(id)}
+                    matchesPlayed={playedCount(id)}
+                    compact
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {!hasEnoughEligible && (
+        <p className="mt-3 text-xs text-red-400 font-semibold">
+          Cannot start match: each team must have at least 2 eligible players. Unverified players who have already played 1 match must verify their email first.
+        </p>
+      )}
+
       <button
         onClick={submit}
-        disabled={saving}
+        disabled={saving || !hasEnoughEligible}
         className="w-full mt-6 py-3 bg-red-600 text-white rounded-full font-bold disabled:opacity-60"
       >
         {saving ? "Saving..." : "Start match"}
@@ -98,7 +150,11 @@ export function InningsSetupPanel({
   const nameOf = (id: string) => (id === sb.teamAId ? sb.teamAName : sb.teamBName);
   // only players picked for today's match
   const squad = (teamId: string) => (teamId === sb.teamAId ? sb.playingA : sb.playingB) ?? [];
-  const label = (playerId: string) => sb.playerNames[playerId] ?? "Player";
+  const label = (playerId: string) => {
+    const name = sb.playerNames[playerId] ?? "Player";
+    const verified = sb.playerVerified?.[playerId];
+    return `${name} ${verified ? "✓ Verified" : "(Unverified)"}`;
+  };
 
   const batters = squad(battingTeamId);
   const bowlers = squad(bowlingTeamId);

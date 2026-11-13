@@ -276,3 +276,6 @@ body::-webkit-scrollbar {
     transform: translateY(-20px);
   }
 }
+
+/* never scroll sideways on phones */
+html, body { overflow-x: clip; max-width: 100vw; }

@@ -34,5 +34,8 @@ public class MyProfileResponse {
     private String organizerRequestReason;
     private String organizerRequestAt;
 
+    private boolean emailVerified;
+    private int matchesPlayed;
+
     private String message;           // "Login Successful" on login, null otherwise
 }

@@ -182,7 +182,7 @@ export default function DashboardMatches() {
             />
           )}
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-white">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">
               {tournamentDetails.name}
             </h1>
           </div>
@@ -266,7 +266,7 @@ export default function DashboardMatches() {
             </div>
           )}
           {/* TOP TABS */}
-          <div className="flex gap-3 mb-8">
+          <div className="flex flex-wrap gap-3 mb-8">
             {["matches", "points", "leaderboard"].map((tab) => (
               <motion.button
                 key={tab}
@@ -299,7 +299,7 @@ export default function DashboardMatches() {
                 exit={{ opacity: 0, y: -20 }}
               >
                 {/* MATCH FILTER */}
-                <div className="flex gap-3 mb-8">
+                <div className="flex flex-wrap gap-3 mb-8">
                   {["LIVE" , "FINISHED" , "ABANDONED" , "UPCOMING"].map((status) => (
                     <motion.button
                       key={status}

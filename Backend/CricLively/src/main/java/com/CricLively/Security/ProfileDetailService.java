@@ -24,9 +24,10 @@ public class ProfileDetailService implements UserDetailsService {
 
     @Override
     public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
-        Profile profile = this.profileRepository.findByEmail(username).orElseThrow(
-                () -> new UsernameNotFoundException("Email details not found")
-        );
+        String trimmed = username.trim();
+        Profile profile = this.profileRepository.findByEmail(trimmed)
+                .or(() -> this.profileRepository.findByEmailIgnoreCase(trimmed))
+                .orElseThrow(() -> new UsernameNotFoundException("Email details not found"));
         List<GrantedAuthority> authorities = (profile.getRole() == null ? List.<Role>of() : profile.getRole()).stream()
                 .map(role -> (GrantedAuthority)
                         new SimpleGrantedAuthority("ROLE_" + role.name()))

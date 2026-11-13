@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate, NavLink } from "react-router-dom";
 import ImageController from "../API/ImageController";
 import { logout } from "../API/PlayerAPI";
-import { clearSession, getSession, isAdmin } from "../lib/auth";
+import { canOrganize, clearSession, getSession, isAdmin } from "../lib/auth";
+import AddPlayerDialog from "./AddPlayerDialog";
 
 const authNavItems = [
   { name: "Home", to: "/" },
@@ -21,6 +22,8 @@ const appNavItems = [
 export default function Navbar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false); // phone menu
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const playerId = sessionStorage.getItem("playerId");
@@ -30,6 +33,7 @@ export default function Navbar() {
 
   useEffect(() => { 
     setIsAuthenticated(!!getSession());
+    setMenuOpen(false); // close the phone menu after going to another page
   }, [location.pathname]);
 
   useEffect(() => {
@@ -71,6 +75,7 @@ export default function Navbar() {
   const navItems = isAuthenticated ? appNavItems : authNavItems;
 
   return (
+    <>
     <motion.nav
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -110,10 +115,10 @@ export default function Navbar() {
         </div>
 
         {/* Right Section */}
-        <div className="flex items-center gap-4 relative">
+        <div className="flex items-center gap-2 sm:gap-4 relative">
           {/* Live Button */}
           <motion.button
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-accent text-accent-foreground text-sm font-semibold"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-accent text-accent-foreground text-xs sm:text-sm font-semibold whitespace-nowrap"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -123,6 +128,17 @@ export default function Navbar() {
             </span>
             Live Scores
           </motion.button>
+
+          {/* Phone menu button (the links are hidden on small screens) */}
+          <button
+            type="button"
+            aria-label="Menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((o) => !o)}
+            className="md:hidden w-10 h-10 rounded-full bg-secondary/70 flex items-center justify-center text-foreground text-xl"
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
 
           {/* Profile Dropdown */}
           {isAuthenticated && (
@@ -168,6 +184,19 @@ export default function Navbar() {
                       Manage Profile
                     </button>
 
+                    {/* organizer + admin */}
+                    {canOrganize() && (
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setShowAddPlayer(true);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-red-600 hover:text-white transition"
+                      >
+                        Add Player
+                      </button>
+                    )}
+
                     {/* admin only */}
                     {isAdmin() && (
                       <button
@@ -194,6 +223,36 @@ export default function Navbar() {
           )}
         </div>
       </div>
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="md:hidden px-4 pt-3 pb-2"
+          >
+            <div className="flex flex-col gap-1 bg-card/90 backdrop-blur-xl rounded-2xl p-2 shadow-xl">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `px-4 py-3 rounded-xl text-sm font-semibold ${
+                      isActive ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-foreground/10"
+                    }`
+                  }
+                >
+                  {item.name}
+                </NavLink>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.nav>
+    {showAddPlayer && (
+      <AddPlayerDialog onClose={() => setShowAddPlayer(false)} />
+    )}
+    </>
   );
 }

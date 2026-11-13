@@ -72,7 +72,7 @@ export default function Matches() {
           {/* Header */}
           <div className="flex justify-between items-center mb-10">
             <motion.h1
-              className="text-4xl md:text-5xl font-extrabold text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
             >
@@ -113,7 +113,7 @@ export default function Matches() {
           </div>
 
           {/* Status Buttons */}
-          <div className="flex gap-4 mb-10">
+          <div className="flex flex-wrap gap-3 mb-10">
             {(
               ["LIVE", "UPCOMING", "FINISHED", "ABANDONED"] as MatchStatus[]
             ).map((status) => (

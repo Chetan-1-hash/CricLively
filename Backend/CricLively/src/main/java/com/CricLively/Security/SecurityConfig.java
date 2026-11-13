@@ -50,7 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/profile/login", "/profile/logout",
-                                "/player/register").permitAll()
+                                "/profile/verify-email", "/player/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
 
                         // ---------- 2. ADMIN only ----------
@@ -61,7 +61,7 @@ public class SecurityConfig {
 
                         // ---------- 3. ORGANIZER (and ADMIN): create and run things ----------
                         .requestMatchers(HttpMethod.POST, "/tournaments", "/tournaments/*/extend", "/matches", "/team/addTeam",
-                                "/images/upload").hasAnyRole("ORGANIZER", "ADMIN")
+                                "/images/upload", "/player/add").hasAnyRole("ORGANIZER", "ADMIN")
                         .requestMatchers("/profile/getProfileList").hasAnyRole("ORGANIZER", "ADMIN")
 
                         // SCORER: anything that CHANGES a match (toss, innings, balls, finish, abandon)

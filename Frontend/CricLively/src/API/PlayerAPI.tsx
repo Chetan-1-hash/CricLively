@@ -1,4 +1,4 @@
-import type { LoginRequest } from "../components/data/DTO";
+import type { AddPlayerProfileRequest, LoginRequest, ProfileList } from "../components/data/DTO";
 import type { MyProfile } from "../lib/auth";
 import { api } from "./client";
 
@@ -10,3 +10,7 @@ export const login = (request: LoginRequest) =>
 export const fetchMe = () => api<MyProfile>("/profile/me", { redirectOn401: false });
 
 export const logout = () => api("/profile/logout", { method: "POST", redirectOn401: false });
+
+// ORGANIZER or ADMIN adds a new player + profile directly
+export const addPlayerProfile = (request: AddPlayerProfileRequest) =>
+  api<ProfileList>("/player/add", { method: "POST", body: request });

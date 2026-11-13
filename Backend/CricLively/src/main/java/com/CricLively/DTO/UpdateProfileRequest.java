@@ -7,7 +7,7 @@ import java.time.LocalDate;
 /**
  * What a person (or an admin) can change about a profile.
  * A field that is left out (null) is NOT changed.
- * Email and password cannot be changed here on purpose.
+ * Password cannot be changed here on purpose.
  */
 @Data
 public class UpdateProfileRequest {
@@ -15,5 +15,6 @@ public class UpdateProfileRequest {
     private String middleName;   // "" clears it
     private String lastName;
     private LocalDate dob;       // yyyy-MM-dd
+    private String email;
     private String mobileNumber;
 }

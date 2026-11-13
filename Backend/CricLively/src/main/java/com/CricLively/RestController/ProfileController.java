@@ -4,6 +4,10 @@ import com.CricLively.DTO.LoginRequest;
 import com.CricLively.DTO.MyProfileResponse;
 import com.CricLively.DTO.ProfileList;
 import com.CricLively.DTO.UpdateProfileRequest;
+import com.CricLively.DTO.VerifyEmailRequest;
+import com.CricLively.Entities.Profile;
+import com.CricLively.Security.ProfileDetailService;
+import com.CricLively.Service.EmailVerificationService;
 import com.CricLively.Service.ProfileService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +40,8 @@ import java.util.Map;
 public class ProfileController {
 
     private final ProfileService profileService;
+    private final EmailVerificationService emailVerificationService;
+    private final ProfileDetailService profileDetailService;
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository =
             new HttpSessionSecurityContextRepository();
@@ -101,9 +108,57 @@ public class ProfileController {
 
     /** A person edits THEIR OWN profile. There is no id in the URL on purpose: it is always "me". */
     @PutMapping("/me")
-    public ResponseEntity<?> updateMe(@RequestBody UpdateProfileRequest request, Authentication auth) {
+    public ResponseEntity<?> updateMe(@RequestBody UpdateProfileRequest request,
+                                      Authentication auth,
+                                      HttpServletRequest httpReq,
+                                      HttpServletResponse httpRes) {
         try {
-            return ResponseEntity.ok(profileService.updateMyInfo(auth.getName(), request));
+            MyProfileResponse updated = profileService.updateMyInfo(auth.getName(), request);
+            if (updated.getEmail() != null && !updated.getEmail().equals(auth.getName())) {
+                UserDetails updatedUser = profileDetailService.loadUserByUsername(updated.getEmail());
+                SecurityContext context = SecurityContextHolder.createEmptyContext();
+                context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                        updatedUser, null, updatedUser.getAuthorities()));
+                SecurityContextHolder.setContext(context);
+                securityContextRepository.saveContext(context, httpReq, httpRes);
+            }
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Send a free email verification code / link to the logged-in user's email. */
+    @PostMapping("/me/send-verification")
+    public ResponseEntity<?> sendMyVerification(Authentication auth) {
+        try {
+            return ResponseEntity.ok(emailVerificationService.sendVerification(auth.getName()));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Verify the logged-in user's email with the 6-digit code. */
+    @PostMapping("/me/verify-email")
+    public ResponseEntity<?> verifyMyEmail(@RequestBody VerifyEmailRequest request, Authentication auth) {
+        try {
+            Profile verified = emailVerificationService.verifyEmail(auth.getName(), request.getCode());
+            return ResponseEntity.ok(profileService.toResponse(verified));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Public verification endpoint used when clicking the link from an email. */
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody VerifyEmailRequest request) {
+        try {
+            Profile verified = emailVerificationService.verifyEmail(request.getEmail(), request.getCode());
+            return ResponseEntity.ok(Map.of(
+                    "verified", true,
+                    "email", verified.getEmail(),
+                    "message", "Email verified successfully!"
+            ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

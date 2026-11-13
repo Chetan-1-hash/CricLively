@@ -11,7 +11,7 @@ export default function TeamGenerationSection() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
-        className="container mx-auto max-w-3xl bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl text-center"
+        className="container mx-auto max-w-3xl bg-card/80 backdrop-blur-xl rounded-3xl p-5 sm:p-8 shadow-2xl text-center"
       >
         <h2 className="text-3xl md:text-4xl font-extrabold text-foreground mb-3">Team Generation</h2>
         <p className="text-foreground/70 mb-6">

@@ -52,7 +52,7 @@ export default function HeroSection() {
             </motion.span>
 
             <motion.h1
-              className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-tight mb-6"
+              className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-tight mb-6"
               style={{ fontFamily: "'Syne', 'Poppins', sans-serif" }}
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -90,7 +90,7 @@ export default function HeroSection() {
             >
               {/* Primary — white pill */}
               <motion.button
-                className="px-8 py-4 rounded-full font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
+                className="px-8 py-4 rounded-full font-semibold text-base sm:text-lg shadow-lg hover:shadow-xl transition-all"
                 style={{
                   background: 'white',
                   color: 'hsl(100, 55%, 22%)',
@@ -104,7 +104,7 @@ export default function HeroSection() {
 
               {/* Ghost — glass border */}
               <motion.button
-                className="px-8 py-4 rounded-full font-semibold text-lg text-foreground transition-all"
+                className="px-8 py-4 rounded-full font-semibold text-base sm:text-lg text-foreground transition-all"
                 style={{
                   background: 'rgba(255,255,255,0.1)',
                   border: '1.5px solid rgba(255,255,255,0.32)',
@@ -129,7 +129,7 @@ export default function HeroSection() {
             className="relative"
           >
             <Suspense fallback={
-              <div className="w-full h-[500px] flex items-center justify-center">
+              <div className="w-full h-[320px] sm:h-[500px] flex items-center justify-center">
                 <div className="w-16 h-16 border-4 border-foreground/30 border-t-foreground rounded-full animate-spin" />
               </div>
             }>

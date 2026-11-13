@@ -35,6 +35,7 @@ public class ScoringService {
     private final PlayerRepository playerRepository;
     private final ProfileRepository profileRepository;
     private final TournamentRepository tournamentRepository;
+    private final PlayerEligibilityService eligibilityService;
 
     // ------------------------------------------------------------ read
 
@@ -48,6 +49,19 @@ public class ScoringService {
 
         Set<String> ids = new LinkedHashSet<>(squadA);
         ids.addAll(squadB);
+        if (match.getPlayingXiA() != null) ids.addAll(match.getPlayingXiA());
+        if (match.getPlayingXiB() != null) ids.addAll(match.getPlayingXiB());
+
+        Map<String, Boolean> verifiedMap = new HashMap<>();
+        Map<String, Integer> otherPlayedMap = new HashMap<>();
+        if (!ids.isEmpty()) {
+            Map<String, Integer> allOtherPlayed = eligibilityService.matchesPlayedMap(matchId);
+            profileRepository.findAllById(ids).forEach(p -> verifiedMap.put(p.getId(), p.isEmailVerified()));
+            for (String id : ids) {
+                verifiedMap.putIfAbsent(id, false);
+                otherPlayedMap.put(id, allOtherPlayed.getOrDefault(id, 0));
+            }
+        }
 
         return ScoreboardResponse.builder()
                 .matchId(match.getId())
@@ -67,6 +81,8 @@ public class ScoringService {
                 .playingA(match.getPlayingXiA() == null ? List.of() : match.getPlayingXiA())
                 .playingB(match.getPlayingXiB() == null ? List.of() : match.getPlayingXiB())
                 .playerNames(namesOf(ids))
+                .playerVerified(verifiedMap)
+                .playerMatchesPlayed(otherPlayedMap)
                 .toss(match.getToss())
                 .innings1(match.getInnings1())
                 .innings2(match.getInnings2())
@@ -99,6 +115,18 @@ public class ScoringService {
         if (!toss.getWinnerId().equals(match.getTeamAId()) && !toss.getWinnerId().equals(match.getTeamBId())) {
             throw new IllegalArgumentException("Toss winner must be one of the two teams");
         }
+
+        Team teamA = teamRepository.findById(match.getTeamAId()).orElse(null);
+        Team teamB = teamRepository.findById(match.getTeamBId()).orElse(null);
+        if (teamA != null && eligibilityService.eligibleFromSquad(squadOf(teamA), matchId).size() < MIN_PLAYERS) {
+            throw new IllegalStateException(teamA.getTeamName() + " needs at least " + MIN_PLAYERS
+                    + " verified or eligible players to start this match (unverified players with 1 match played must verify email).");
+        }
+        if (teamB != null && eligibilityService.eligibleFromSquad(squadOf(teamB), matchId).size() < MIN_PLAYERS) {
+            throw new IllegalStateException(teamB.getTeamName() + " needs at least " + MIN_PLAYERS
+                    + " verified or eligible players to start this match (unverified players with 1 match played must verify email).");
+        }
+
         match.setToss(toss);
         match.setMatchStatus(MatchStatus.LIVE);
         return matchRepository.save(match);
@@ -114,8 +142,13 @@ public class ScoringService {
         Team a = teamRepository.findById(match.getTeamAId()).orElseThrow(() -> new IllegalArgumentException("Team 1 not found"));
         Team b = teamRepository.findById(match.getTeamBId()).orElseThrow(() -> new IllegalArgumentException("Team 2 not found"));
 
-        match.setPlayingXiA(checkLineup(teamA, squadOf(a), a.getTeamName()));
-        match.setPlayingXiB(checkLineup(teamB, squadOf(b), b.getTeamName()));
+        List<String> cleanA = checkLineup(teamA, squadOf(a), a.getTeamName());
+        List<String> cleanB = checkLineup(teamB, squadOf(b), b.getTeamName());
+        eligibilityService.requireEligibleToPlay(cleanA, matchId, "play in this match");
+        eligibilityService.requireEligibleToPlay(cleanB, matchId, "play in this match");
+
+        match.setPlayingXiA(cleanA);
+        match.setPlayingXiB(cleanB);
         return matchRepository.save(match);
     }
 
@@ -125,6 +158,10 @@ public class ScoringService {
         if (match.getToss() == null) throw new IllegalStateException("Do the toss first");
         if (isEmpty(match.getPlayingXiA()) || isEmpty(match.getPlayingXiB())) {
             throw new IllegalStateException("Pick the playing team of both sides first");
+        }
+        if (inningsNo == 1) {
+            eligibilityService.requireEligibleToPlay(match.getPlayingXiA(), matchId, "play in this match");
+            eligibilityService.requireEligibleToPlay(match.getPlayingXiB(), matchId, "play in this match");
         }
 
         if (inningsNo == 1 && match.getInnings1() != null) throw new IllegalStateException("Innings 1 has already started");

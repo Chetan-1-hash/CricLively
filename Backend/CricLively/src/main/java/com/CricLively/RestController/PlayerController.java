@@ -1,8 +1,10 @@
 package com.CricLively.RestController;
 
+import com.CricLively.DTO.AddPlayerProfileRequest;
 import com.CricLively.DTO.PlayerCricketDetailsRequest;
 import com.CricLively.DTO.PlayerRegisterRequest;
 import com.CricLively.DTO.PlayerRegisterResponse;
+import com.CricLively.DTO.ProfileList;
 import com.CricLively.Entities.Player;
 import com.CricLively.Exceptions.RegistrationException;
 import com.CricLively.Exceptions.UpdateCricketDetailsException;
@@ -57,6 +59,17 @@ public class PlayerController {
                     ));
         }
 
+    }
+
+    /** ORGANIZER or ADMIN adds a new player + profile directly. */
+    @PostMapping("/add")
+    public ResponseEntity<?> addPlayerProfile(@RequestBody AddPlayerProfileRequest request) {
+        try {
+            ProfileList created = this.profileService.createPlayerProfileByStaff(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (RegistrationException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage()));
+        }
     }
 
     @PutMapping("/{playerId}/playerInfo")

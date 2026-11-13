@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "../hooks/use-toast";
@@ -40,7 +40,7 @@ function Shell({ title, subtitle, onExit, matchId, canManage, children }: {
     <>
       <Navbar />
       <section className="min-h-[100vh] py-12 bg-background/80">
-        <div className="container my-8 mx-auto px-6 max-w-3xl">
+        <div className="container my-8 mx-auto px-4 sm:px-6 max-w-3xl">
           <div className="flex justify-between items-center mb-8 gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">{title}</h1>
@@ -140,6 +140,19 @@ export default function Scorer() {
     setFielderId("");
     setAssistIds([]);
   };
+
+  // When an over is finished (and the match goes on), open the "Select bowler" window by itself.
+  // It opens once per over: closing it, or choosing a bowler, does not bring it back until the next over.
+  const askedAtBall = useRef<string>("");
+  useEffect(() => {
+    if (!base || sb?.matchStatus !== "LIVE" || base.innings.length === 0) return;
+    const inn = base.innings[base.currentInningsIndex];
+    if (inn.isComplete || inn.balls.length === 0 || inn.ballsInCurrentOver !== 0) return;
+    const key = `${base.currentInningsIndex}:${inn.balls.length}`;
+    if (askedAtBall.current === key) return;
+    askedAtBall.current = key;
+    setShowBowlerPicker(true);
+  }, [base, sb?.matchStatus]);
 
   const exit = () => navigate(-1);
 
@@ -415,7 +428,7 @@ export default function Scorer() {
     <>
       <Navbar />
       <section className="min-h-[100vh] relative py-12 bg-background/80">
-      <div className="container my-8 mx-auto px-6 relative max-w-3xl">
+      <div className="container my-8 mx-auto px-4 sm:px-6 relative max-w-3xl">
         {/* Header */}
         <motion.div
           className="flex justify-between items-center mb-8 gap-4"
@@ -500,7 +513,7 @@ export default function Scorer() {
 
           {overJustCompleted && (
             <p className="mt-3 text-xs font-semibold text-red-600">
-              Over complete — confirm or change the bowler before continuing.
+              Over complete — choose the bowler for the next over (use Change).
             </p>
           )}
         </motion.div>
@@ -513,7 +526,7 @@ export default function Scorer() {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <h2 className="text-lg font-bold text-foreground mb-3">Runs off the bat</h2>
-          <div className="grid grid-cols-7 gap-2 mb-5">
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-5">
             {RUN_OPTIONS.map((r) => (
               <motion.button
                 key={r}
@@ -532,7 +545,7 @@ export default function Scorer() {
           </div>
 
           <h2 className="text-lg font-bold text-foreground mb-3">Extras</h2>
-          <div className="grid grid-cols-5 gap-2 mb-5">
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2 mb-5">
             {EXTRA_TYPES.map((ex) => (
               <motion.button
                 key={ex}
@@ -751,7 +764,7 @@ export default function Scorer() {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-card rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+              className="bg-card rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto shadow-2xl"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -791,7 +804,7 @@ export default function Scorer() {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-card rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+              className="bg-card rounded-3xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto shadow-2xl"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}

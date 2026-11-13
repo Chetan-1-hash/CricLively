@@ -6,8 +6,14 @@ import Navbar from "./Navbar";
 import { fetchMe } from "../API/PlayerAPI";
 import { API_URL } from "../API/client";
 import { saveSession, type MyProfile, type Role } from "../lib/auth";
-import { requestOrganizer, cancelOrganizerRequest } from "../API/ProfileEditAPI";
+import {
+  requestOrganizer,
+  cancelOrganizerRequest,
+  sendVerificationEmail,
+  verifyMyEmail,
+} from "../API/ProfileEditAPI";
 import { toast } from "../hooks/use-toast";
+import VerificationBadge from "./VerificationBadge";
 
 const ROLE_INFO: Record<Role, string> = {
   ADMIN: "Admin: full access to everything",
@@ -33,6 +39,54 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const sendCode = async () => {
+    setVerifying(true);
+    setSendError("");
+    try {
+      const res = await sendVerificationEmail();
+      if (res.alreadyVerified) {
+        const fresh = await fetchMe();
+        setMe(fresh);
+        saveSession(fresh);
+        toast({ title: "Email already verified" });
+        return;
+      }
+      setCodeSent(true);
+      toast({ title: "Verification email sent", description: res.message });
+    } catch (e) {
+      const msg = (e as Error).message || "Could not send verification email";
+      setSendError(msg);
+      toast({ title: "Could not send code", description: msg, variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const confirmVerify = async () => {
+    if (!verifyCode.trim()) {
+      toast({ title: "Enter the 6-digit verification code", variant: "destructive" });
+      return;
+    }
+    setVerifying(true);
+    try {
+      const updated = await verifyMyEmail(verifyCode.trim());
+      setMe(updated);
+      saveSession(updated);
+      setVerifyCode("");
+      setCodeSent(false);
+      setSendError("");
+      toast({ title: "Email verified!", description: "You can now play unlimited matches and tournaments." });
+    } catch (e) {
+      toast({ title: "Verification failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const isOrganizer = !!me && (me.roles.includes("ORGANIZER") || me.roles.includes("ADMIN"));
 
@@ -119,6 +173,7 @@ export default function ProfilePage() {
                       {role}
                     </span>
                   ))}
+                  <VerificationBadge verified={me.emailVerified} matchesPlayed={me.matchesPlayed ?? 0} />
                 </div>
               </div>
 
@@ -128,7 +183,69 @@ export default function ProfilePage() {
                 <Row label="Email" value={me.email} />
                 <Row label="Mobile" value={me.mobileNumber} />
                 <Row label="Date of birth" value={me.dob} />
+                <Row label="Matches played" value={String(me.matchesPlayed ?? 0)} />
               </div>
+
+              {/* Email Verification */}
+              {!me.emailVerified && (
+                <div className="mb-5 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2.5">
+                  <h2 className="text-sm font-semibold text-foreground">Email Verification</h2>
+                  <p className="text-xs text-foreground/75">
+                    {(me.matchesPlayed ?? 0) >= 1
+                      ? "You have already played 1 match without verifying your email. Verify your email now to play more matches and tournaments."
+                      : "You can play 1 match without email verification. Verify your email anytime to unlock unlimited matches and tournaments."}
+                  </p>
+
+                  {sendError && (
+                    <p className="text-xs rounded-xl bg-red-500/15 border border-red-500/30 px-3 py-2 text-red-300">
+                      {sendError}
+                    </p>
+                  )}
+
+                  {!codeSent ? (
+                    <button
+                      type="button"
+                      onClick={sendCode}
+                      disabled={verifying}
+                      className="w-full py-2.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60"
+                    >
+                      {verifying ? "Sending…" : "Send Verification Code"}
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-foreground/80">
+                        Check your inbox ({me.email}) for the 6-digit verification code or verification link.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={verifyCode}
+                          onChange={(e) => setVerifyCode(e.target.value)}
+                          placeholder="Enter 6-digit code"
+                          className="flex-1 px-3 py-2 rounded-xl bg-background/80 border border-border text-sm tracking-widest"
+                        />
+                        <button
+                          type="button"
+                          onClick={confirmVerify}
+                          disabled={verifying}
+                          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-60"
+                        >
+                          {verifying ? "Checking…" : "Verify"}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={sendCode}
+                        disabled={verifying}
+                        className="text-xs underline text-foreground/70 hover:text-foreground"
+                      >
+                        Resend code
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Cricket details (only for people who are also players) */}
               {me.playerId && (

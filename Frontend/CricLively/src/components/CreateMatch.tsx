@@ -6,10 +6,12 @@ import TournamentListAPI from "../API/TournamentAPI";
 import { toast } from "../hooks/use-toast";
 import type { TournamentResponse } from "./data/TournamentEntity";
 import { TeamsListAPI } from "../API/TeamsAPI";
-import type { TeamsList } from "./data/DTO";
+import { ProfileListAPI } from "../API/ProfileAPI";
+import type { ProfileList, TeamsList } from "./data/DTO";
 import { addMatch } from "../API/MatchApi";
 import type { AddMatchDTO, MatchType } from "./data/MatchEntity";
 import { getSelectedTournament } from "../lib/selectedTournament";
+import VerificationBadge from "./VerificationBadge";
 
 const MATCH_TYPES: MatchType[] = [
   "LEAGUE", "GROUP", "ROUND_ROBIN",
@@ -43,6 +45,7 @@ export default function CreateMatch() {
 
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
   const [allTeams, setAllTeams] = useState<TeamsList[]>([]);
+  const [profilesById, setProfilesById] = useState<Record<string, ProfileList>>({});
   const [saving, setSaving] = useState(false);
   const [matchDTO, setMatchDTO] = useState<AddMatchDTO>({
     tournamentId: presetTournamentId,
@@ -69,6 +72,16 @@ export default function CreateMatch() {
     TeamsListAPI()
       .then(setAllTeams)
       .catch(() => toast({ title: "Could not load teams", variant: "destructive" }));
+
+    ProfileListAPI()
+      .then((list) => {
+        const map: Record<string, ProfileList> = {};
+        list.forEach((p) => {
+          if (p.id) map[p.id] = p;
+        });
+        setProfilesById(map);
+      })
+      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -150,7 +163,7 @@ export default function CreateMatch() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-3xl bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl"
+          className="w-full max-w-3xl bg-card/80 backdrop-blur-xl rounded-3xl p-5 sm:p-8 shadow-2xl"
         >
           <h1 className="text-3xl font-bold text-center mb-10">Create Match</h1>
 
@@ -201,6 +214,50 @@ export default function CreateMatch() {
               <p className="text-xs text-foreground/60">
                 No teams found{matchDTO.tournamentId ? " for this tournament" : ""}. Create teams first.
               </p>
+            )}
+
+            {/* SQUAD VERIFICATION PREVIEW */}
+            {(matchDTO.teamAId || matchDTO.teamBId) && Object.keys(profilesById).length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[matchDTO.teamAId, matchDTO.teamBId].map((tid, idx) => {
+                  if (!tid) return <div key={idx} />;
+                  const team = allTeams.find((t) => t.id === tid);
+                  const squad = team?.squadPlayerIds ?? [];
+                  const eligibleCount = squad.filter((id) => {
+                    const p = profilesById[id];
+                    return !p || p.emailVerified || (p.matchesPlayed ?? 0) < 1;
+                  }).length;
+                  return (
+                    <div key={tid} className="rounded-2xl bg-background/50 border border-border/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <span>{team?.teamName ?? `Team ${idx + 1}`} Squad</span>
+                        <span className={eligibleCount < 2 ? "text-red-400" : "text-foreground/70"}>
+                          {eligibleCount}/{squad.length} eligible
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {squad.map((id) => {
+                          const p = profilesById[id];
+                          if (!p) return null;
+                          return (
+                            <span
+                              key={id}
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-card/80 border border-border/50 text-[11px]"
+                            >
+                              <span>{p.firstName} {p.lastName ?? ""}</span>
+                              <VerificationBadge
+                                verified={p.emailVerified}
+                                matchesPlayed={p.matchesPlayed ?? 0}
+                                compact
+                              />
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
             {/* DATE & TIME */}

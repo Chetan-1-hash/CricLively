@@ -6,6 +6,8 @@ import Navbar from "./Navbar";
 import { adminListProfiles, adminApproveOrganizer, adminRejectOrganizer } from "../API/ProfileEditAPI";
 import { toast } from "../hooks/use-toast";
 import type { MyProfile } from "../lib/auth";
+import VerificationBadge from "./VerificationBadge";
+import AddPlayerDialog from "./AddPlayerDialog";
 
 // ADMIN ONLY page (guarded in App.tsx and again by the server).
 export default function AdminProfiles() {
@@ -14,12 +16,18 @@ export default function AdminProfiles() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
 
-  useEffect(() => {
+  const loadProfiles = () => {
+    setLoading(true);
     adminListProfiles()
       .then(setProfiles)
       .catch((e: Error) => setError(e.message || "Could not load users"))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadProfiles();
   }, []);
 
   const decide = async (p: MyProfile, approve: boolean) => {
@@ -55,7 +63,16 @@ export default function AdminProfiles() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-4xl bg-card/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl"
         >
-          <h1 className="text-3xl font-bold text-foreground text-center mb-6">Manage users</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <h1 className="text-3xl font-bold text-foreground">Manage users</h1>
+            <button
+              type="button"
+              onClick={() => setShowAddPlayer(true)}
+              className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+            >
+              + Add Player & Profile
+            </button>
+          </div>
 
           {pending.length > 0 && (
             <div className="mb-6 rounded-2xl border border-yellow-500/60 bg-yellow-500/10 p-4">
@@ -106,7 +123,14 @@ export default function AdminProfiles() {
                   <p className="text-xs text-foreground/60">
                     {p.email} · {p.mobileNumber ?? "no mobile"}
                   </p>
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <VerificationBadge
+                      verified={p.emailVerified}
+                      matchesPlayed={p.matchesPlayed ?? 0}
+                    />
+                    <span className="px-2.5 py-0.5 rounded-full bg-foreground/10 text-xs font-medium">
+                      Matches: {p.matchesPlayed ?? 0}
+                    </span>
                     {p.organizerRequestStatus === "PENDING" && (
                       <span className="px-2.5 py-0.5 rounded-full bg-yellow-500 text-black text-xs font-semibold">
                         Wants organizer access
@@ -130,6 +154,12 @@ export default function AdminProfiles() {
           </div>
         </motion.div>
       </section>
+      {showAddPlayer && (
+        <AddPlayerDialog
+          onClose={() => setShowAddPlayer(false)}
+          onCreated={() => loadProfiles()}
+        />
+      )}
     </>
   );
 }

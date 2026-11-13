@@ -7,6 +7,8 @@ import { addTeamAPI, TeamsListAPI } from "../API/TeamsAPI";
 import TournamentAPI from "../API/TournamentAPI";
 import { toast } from "../hooks/use-toast";
 import { useLocation, useNavigate } from "react-router-dom";
+import VerificationBadge from "./VerificationBadge";
+import AddPlayerDialog from "./AddPlayerDialog";
 
 type Tournament = {
   id: string;
@@ -41,6 +43,9 @@ export default function CreateTeam() {
   /* ---------------- LOGO ---------------- */
   const [logo, setLogo] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+
+  const isPlayerBlocked = (p: ProfileList) => !p.emailVerified && (p.matchesPlayed ?? 0) >= 1;
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,10 +69,11 @@ export default function CreateTeam() {
         setNameChecked(true);
         return;
       }
+      const currentTournamentId = selectedTournament?.id || tournamentId;
       const exists = teams.some(
         (t) =>
-          typeof t.teamName === "string" && 
-          String(t.tournamentId) === tournamentId &&
+          typeof t.teamName === "string" &&
+          (!currentTournamentId || String(t.tournamentId) === String(currentTournamentId)) &&
           t.teamName.trim().toLowerCase() === teamName.trim().toLowerCase()
       );
 
@@ -112,8 +118,16 @@ export default function CreateTeam() {
 
   const selectCaptain = (p: ProfileList) => {
     if (!p.id) return;
+    if (isPlayerBlocked(p)) {
+      toast({
+        title: "Email verification required",
+        description: `${p.firstName} has already played 1 match without email verification and cannot join a team until verifying their email.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedCaptainId(p.id);
-    setCaptainQuery(`${p.firstName} ${p.lastName}`);
+    setCaptainQuery(`${p.firstName} ${p.lastName ?? ""}`.trim());
     setHasSearchedCaptain(false);
   };
 
@@ -206,6 +220,14 @@ export default function CreateTeam() {
 
   const addPlayer = (p: ProfileList) => {
     if (!p.id) return;
+    if (isPlayerBlocked(p)) {
+      toast({
+        title: "Email verification required",
+        description: `${p.firstName} has already played 1 match without email verification and cannot play any more matches or tournaments until verifying their email.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedPlayerIds((prev) => [...prev, p.id!]);
     setPlayerQuery("");
     setHasSearched(false);
@@ -256,7 +278,7 @@ export default function CreateTeam() {
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-3xl bg-card/80 rounded-3xl p-8 shadow-2xl"
+          className="w-full max-w-3xl bg-card/80 rounded-3xl p-5 sm:p-8 shadow-2xl"
         >
           <h1 className="text-3xl font-bold text-center mb-8">Create Team</h1>
 
@@ -343,21 +365,48 @@ export default function CreateTeam() {
               </button>
             </div>
 
-            {filteredCaptain.map((p) => (
-              <div
-                key={p.id}
-                onClick={() => selectCaptain(p)}
-                className="cursor-pointer px-3 py-2 bg-primary/10 rounded-lg"
-              >
-                {p.firstName} {p.middleName ?? ""} {p.lastName}
-              </div>
-            ))}
+            <div className="space-y-1.5">
+              {filteredCaptain.map((p) => {
+                const blocked = isPlayerBlocked(p);
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => selectCaptain(p)}
+                    className={`px-3 py-2 rounded-lg flex flex-wrap items-center justify-between gap-2 ${
+                      blocked
+                        ? "bg-red-500/10 opacity-70 cursor-not-allowed"
+                        : "cursor-pointer bg-primary/10 hover:bg-primary/20"
+                    }`}
+                  >
+                    <span className="text-sm font-medium">
+                      {p.firstName} {p.middleName ?? ""} {p.lastName ?? ""}
+                    </span>
+                    <VerificationBadge
+                      verified={p.emailVerified}
+                      matchesPlayed={p.matchesPlayed ?? 0}
+                    />
+                  </div>
+                );
+              })}
+            </div>
 
-            {selectedCaptainId && (
-              <span className="px-3 py-1 bg-primary/20 rounded-full text-sm">
-                Captain Selected
-              </span>
-            )}
+            {selectedCaptainId && (() => {
+              const cap = allPlayers.find((pl) => pl.id === selectedCaptainId);
+              return (
+                <div className="inline-flex flex-wrap items-center gap-2 px-3 py-1 bg-primary/20 rounded-full text-sm">
+                  <span>
+                    Captain: {cap ? `${cap.firstName} ${cap.lastName ?? ""}`.trim() : "Selected"}
+                  </span>
+                  {cap && (
+                    <VerificationBadge
+                      verified={cap.emailVerified}
+                      matchesPlayed={cap.matchesPlayed ?? 0}
+                      compact
+                    />
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* TOURNAMENT */}
@@ -408,7 +457,16 @@ export default function CreateTeam() {
 
           {/* PLAYERS */}
           <div className="mt-6 space-y-2">
-            <label className="text-sm font-medium">Add Players</label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-medium">Add Players</label>
+              <button
+                type="button"
+                onClick={() => setShowAddPlayer(true)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-primary/15 text-primary hover:bg-primary/25 transition"
+              >
+                + Add New Player & Profile
+              </button>
+            </div>
 
             <div className="flex gap-2">
               <input
@@ -430,16 +488,29 @@ export default function CreateTeam() {
             </div>
 
             {/* FILTERED PLAYERS */}
-            <div>
-              {filteredPlayers.map((p) => (
-                <div
-                  key={p.id ?? Math.random()}
-                  onClick={() => addPlayer(p)}
-                  className="cursor-pointer px-3 py-2 bg-primary/10 rounded-lg"
-                >
-                  {p.firstName} {p.middleName ?? ""} {p.lastName}
-                </div>
-              ))}
+            <div className="space-y-1.5">
+              {filteredPlayers.map((p) => {
+                const blocked = isPlayerBlocked(p);
+                return (
+                  <div
+                    key={p.id ?? Math.random()}
+                    onClick={() => addPlayer(p)}
+                    className={`px-3 py-2 rounded-lg flex flex-wrap items-center justify-between gap-2 ${
+                      blocked
+                        ? "bg-red-500/10 opacity-70 cursor-not-allowed"
+                        : "cursor-pointer bg-primary/10 hover:bg-primary/20"
+                    }`}
+                  >
+                    <span className="text-sm font-medium">
+                      {p.firstName} {p.middleName ?? ""} {p.lastName ?? ""}
+                    </span>
+                    <VerificationBadge
+                      verified={p.emailVerified}
+                      matchesPlayed={p.matchesPlayed ?? 0}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             {/* SELECTED PLAYERS */}
@@ -451,9 +522,26 @@ export default function CreateTeam() {
                   return (
                     <span
                       key={p.id ?? index}
-                      className="px-3 py-1 bg-primary/20 rounded-full text-sm"
+                      className="inline-flex items-center gap-2 px-3 py-1 bg-primary/20 rounded-full text-sm"
                     >
-                      {p.firstName} {p.middleName ?? ""} {p.lastName}
+                      <span>
+                        {p.firstName} {p.middleName ?? ""} {p.lastName ?? ""}
+                      </span>
+                      <VerificationBadge
+                        verified={p.emailVerified}
+                        matchesPlayed={p.matchesPlayed ?? 0}
+                        compact
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedPlayerIds((prev) => prev.filter((x) => x !== id))
+                        }
+                        className="text-xs font-bold text-foreground/60 hover:text-red-500"
+                        title="Remove player"
+                      >
+                        ✕
+                      </button>
                     </span>
                   );
                 })}
@@ -471,6 +559,19 @@ export default function CreateTeam() {
           </button>
         </motion.div>
       </section>
+      {showAddPlayer && (
+        <AddPlayerDialog
+          onClose={() => setShowAddPlayer(false)}
+          onCreated={(created) => {
+            setAllPlayers((prev) =>
+              prev.some((p) => p.id === created.id) ? prev : [...prev, created]
+            );
+            if (created.id && !selectedPlayerIds.includes(created.id)) {
+              setSelectedPlayerIds((prev) => [...prev, created.id]);
+            }
+          }}
+        />
+      )}
     </>
   );
 }

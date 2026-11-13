@@ -11,9 +11,13 @@ public interface ProfileRepository extends MongoRepository<Profile, String> {
 
     Optional<Profile> findByEmail(String email);
 
+    Optional<Profile> findByEmailIgnoreCase(String email);
+
     Optional<Profile> findByMobileNumber(String mobileNumber);
 
     Boolean existsByEmail(String email);
+
+    Boolean existsByEmailIgnoreCase(String email);
 
     List<ProfileList> findAllBy();
 

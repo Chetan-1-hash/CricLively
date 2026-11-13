@@ -1,2 +1,4 @@
 #Ignore below
 Analysis/
+.env
+application-local.properties

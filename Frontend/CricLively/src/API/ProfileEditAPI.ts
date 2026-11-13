@@ -6,6 +6,7 @@ export interface PersonalInfo {
   middleName: string;
   lastName: string;
   dob: string; // yyyy-MM-dd or ""
+  email: string;
   mobileNumber: string;
 }
 
@@ -41,3 +42,24 @@ export const adminApproveOrganizer = (profileId: string) =>
 
 export const adminRejectOrganizer = (profileId: string) =>
   api<MyProfile>(`/admin/organizer-requests/${profileId}/reject`, { method: "POST" });
+
+// ---- email verification
+export interface SendVerificationResponse {
+  alreadyVerified: boolean;
+  sentViaSmtp?: boolean;
+  email: string;
+  expiresInMinutes?: number;
+  message: string;
+}
+
+export const sendVerificationEmail = () =>
+  api<SendVerificationResponse>("/profile/me/send-verification", { method: "POST" });
+
+export const verifyMyEmail = (code: string) =>
+  api<MyProfile>("/profile/me/verify-email", { method: "POST", body: { code } });
+
+export const verifyEmailPublic = (email: string, code: string) =>
+  api<{ verified: boolean; email: string; message: string }>("/profile/verify-email", {
+    method: "POST",
+    body: { email, code },
+  });

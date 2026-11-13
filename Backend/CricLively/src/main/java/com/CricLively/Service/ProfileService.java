@@ -1,5 +1,6 @@
 package com.CricLively.Service;
 
+import com.CricLively.DTO.AddPlayerProfileRequest;
 import com.CricLively.DTO.MyProfileResponse;
 import com.CricLively.DTO.PlayerRegisterRequest;
 import com.CricLively.DTO.ProfileList;
@@ -11,35 +12,50 @@ import com.CricLively.Exceptions.RegistrationException;
 import com.CricLively.Repository.PlayerRepository;
 import com.CricLively.Repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PostFilter;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.access.prepost.PreFilter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
 
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final ProfileRepository profileRepository;
     private final PlayerRepository playerRepository;
     private final PlayerService playerService;
+    private final PlayerEligibilityService eligibilityService;
 
 
     @Transactional
     public Player register(PlayerRegisterRequest request) throws RegistrationException {
+        String email = request.getEmail() == null ? "" : request.getEmail().trim();
+        String mobile = request.getMobileNumber() == null ? "" : request.getMobileNumber().trim();
 
-        if(this.profileRepository.existsByEmail(request.getEmail())){
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw new RegistrationException("Valid email is required");
+        }
+        if (mobile.isEmpty()) {
+            throw new RegistrationException("Mobile number is required");
+        }
+        if (this.profileRepository.existsByEmail(email) || this.profileRepository.existsByEmailIgnoreCase(email)) {
             throw new RegistrationException("Already registered");
+        }
+        if (this.profileRepository.findByMobileNumber(mobile).isPresent()) {
+            throw new RegistrationException("Mobile number is already registered");
         }
 
         Player player = new Player();
@@ -51,14 +67,94 @@ public class ProfileService {
         Player savedPlayer = playerRepository.save(player);
 
         Profile profile = new Profile();
-        profile.setEmail(request.getEmail());
-        profile.setMobileNumber(request.getMobileNumber());
+        profile.setEmail(email);
+        profile.setMobileNumber(mobile);
         profile.setPassword(request.getPassword());
         profile.setRole(Collections.singleton(Role.PLAYER));
         profile.setPlayerId(savedPlayer.getId());
+        profile.setEmailVerified(false);
         profileRepository.save(profile);
 
         return savedPlayer;
+    }
+
+    /**
+     * ORGANIZER or ADMIN creates a player + profile on behalf of a player.
+     * Password is optional (a random temporary password is generated if omitted).
+     */
+    @Transactional
+    public ProfileList createPlayerProfileByStaff(AddPlayerProfileRequest request) throws RegistrationException {
+        String firstName = request.getFirstName() == null ? "" : request.getFirstName().trim();
+        String email = request.getEmail() == null ? "" : request.getEmail().trim();
+        String mobile = request.getMobileNumber() == null ? "" : request.getMobileNumber().trim();
+
+        if (firstName.isEmpty()) {
+            throw new RegistrationException("First name is required");
+        }
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw new RegistrationException("Valid email address is required");
+        }
+        if (mobile.isEmpty()) {
+            throw new RegistrationException("Mobile number is required");
+        }
+        if (request.getDob() != null && request.getDob().isAfter(LocalDate.now())) {
+            throw new RegistrationException("Date of birth cannot be in the future");
+        }
+        if (profileRepository.existsByEmail(email) || profileRepository.existsByEmailIgnoreCase(email)) {
+            throw new RegistrationException("Email is already registered: " + email);
+        }
+        if (profileRepository.findByMobileNumber(mobile).isPresent()) {
+            throw new RegistrationException("Mobile number is already registered");
+        }
+
+        Player player = new Player();
+        player.setFirstName(firstName);
+        player.setMiddleName(request.getMiddleName() == null ? null : blankToNull(request.getMiddleName()));
+        player.setLastName(request.getLastName() == null ? null : blankToNull(request.getLastName()));
+        player.setDob(request.getDob());
+        if (request.getBattingStyle() != null) player.setBattingStyle(request.getBattingStyle());
+        if (request.getBowlingStyle() != null) player.setBowlingStyle(request.getBowlingStyle());
+        if (request.getPlayingRole() != null) player.setPlayingRole(request.getPlayingRole());
+        boolean hasDetails = request.getBattingStyle() != null
+                || request.getBowlingStyle() != null
+                || request.getPlayingRole() != null;
+        player.setCricketDetailsCompleted(hasDetails);
+
+        Player savedPlayer = playerRepository.save(player);
+
+        String password = (request.getPassword() != null && !request.getPassword().isBlank())
+                ? request.getPassword()
+                : randomTempPassword();
+
+        Profile profile = new Profile();
+        profile.setEmail(email);
+        profile.setMobileNumber(mobile);
+        profile.setPassword(password);
+        profile.setRole(Collections.singleton(Role.PLAYER));
+        profile.setPlayerId(savedPlayer.getId());
+        profile.setEmailVerified(false);
+        Profile savedProfile = profileRepository.save(profile);
+
+        ProfileList dto = new ProfileList();
+        dto.setId(savedProfile.getId());
+        dto.setEmail(savedProfile.getEmail());
+        dto.setMobileNumber(savedProfile.getMobileNumber());
+        dto.setFirstName(savedPlayer.getFirstName());
+        dto.setMiddleName(savedPlayer.getMiddleName());
+        dto.setLastName(savedPlayer.getLastName());
+        dto.setRole(savedProfile.getRole());
+        dto.setEmailVerified(false);
+        dto.setMatchesPlayed(0);
+        return dto;
+    }
+
+    private static String randomTempPassword() {
+        final String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        StringBuilder sb = new StringBuilder(12);
+        for (int i = 0; i < 12; i++) {
+            sb.append(chars.charAt(RANDOM.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     @Transactional
@@ -67,9 +163,9 @@ public class ProfileService {
         List<Player> registeredPlayers = new ArrayList<>();
 
         for (PlayerRegisterRequest request : requests) {
-
-            if (profileRepository.existsByEmail(request.getEmail())) {
-                throw new RegistrationException("Already registered: " + request.getEmail());
+            String email = request.getEmail() == null ? "" : request.getEmail().trim();
+            if (profileRepository.existsByEmail(email) || profileRepository.existsByEmailIgnoreCase(email)) {
+                throw new RegistrationException("Already registered: " + email);
             }
 
             Player player = new Player();
@@ -81,11 +177,12 @@ public class ProfileService {
             Player savedPlayer = playerRepository.save(player);
 
             Profile profile = new Profile();
-            profile.setEmail(request.getEmail());
+            profile.setEmail(email);
             profile.setMobileNumber(request.getMobileNumber());
             profile.setPassword(request.getPassword());
             profile.setRole(Collections.singleton(Role.PLAYER));
             profile.setPlayerId(savedPlayer.getId());
+            profile.setEmailVerified(false);
 
             profileRepository.save(profile);
 
@@ -96,19 +193,23 @@ public class ProfileService {
     }
 
     public List<ProfileList> fetchProfileList() {
+        Map<String, Integer> playedMap = eligibilityService.matchesPlayedMap(null);
 
         return profileRepository.findAll().stream()
                 .filter(
-                        p -> p.getRole().contains(Role.PLAYER) || p.getRole().contains(Role.ORGANIZER)
+                        p -> p.getRole() != null && (p.getRole().contains(Role.PLAYER) || p.getRole().contains(Role.ORGANIZER))
                 )
                 .map(profile -> {
                     ProfileList dto = new ProfileList();
                     dto.setId(profile.getId());
+                    dto.setEmail(profile.getEmail());
                     dto.setRole(profile.getRole().stream()
                             .filter(r -> r == Role.PLAYER || r == Role.ORGANIZER)
                             .collect(Collectors.toSet())
                     );
                     dto.setMobileNumber(profile.getMobileNumber());
+                    dto.setEmailVerified(profile.isEmailVerified());
+                    dto.setMatchesPlayed(playedMap.getOrDefault(profile.getId(), 0));
 
                     // ONLY players have names
                     if (profile.getPlayerId() != null) {
@@ -123,7 +224,9 @@ public class ProfileService {
 
     /** Everything the app needs to know about the person who is logged in. */
     public MyProfileResponse getMyProfile(String email) {
-        Profile profile = profileRepository.findByEmail(email)
+        String trimmed = email == null ? "" : email.trim();
+        Profile profile = profileRepository.findByEmail(trimmed)
+                .or(() -> profileRepository.findByEmailIgnoreCase(trimmed))
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
         return toResponse(profile);
     }
@@ -137,12 +240,17 @@ public class ProfileService {
 
     /** ADMIN: everybody. */
     public List<MyProfileResponse> getAllProfiles() {
-        return profileRepository.findAll().stream().map(this::toResponse).toList();
+        Map<String, Integer> playedMap = eligibilityService.matchesPlayedMap(null);
+        return profileRepository.findAll().stream()
+                .map(p -> toResponse(p, playedMap.getOrDefault(p.getId(), 0)))
+                .toList();
     }
 
     /** Any logged-in person edits THEIR OWN info (the profile comes from the login, never from the request). */
     public MyProfileResponse updateMyInfo(String email, UpdateProfileRequest request) {
-        Profile profile = profileRepository.findByEmail(email)
+        String trimmed = email == null ? "" : email.trim();
+        Profile profile = profileRepository.findByEmail(trimmed)
+                .or(() -> profileRepository.findByEmailIgnoreCase(trimmed))
                 .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
         return applyPersonalInfo(profile, request);
     }
@@ -156,6 +264,35 @@ public class ProfileService {
 
     /** Checks everything first, saves afterwards, so a bad value changes nothing. */
     private MyProfileResponse applyPersonalInfo(Profile profile, UpdateProfileRequest request) {
+        if (request.getEmail() != null) {
+            String email = request.getEmail().trim();
+            if (email.isEmpty()) throw new IllegalArgumentException("Email cannot be empty");
+            if (!EMAIL_PATTERN.matcher(email).matches()) {
+                throw new IllegalArgumentException("Please enter a valid email address");
+            }
+            profileRepository.findByEmail(email).ifPresent(other -> {
+                if (!other.getId().equals(profile.getId())) {
+                    throw new IllegalArgumentException("This email is already used by another account");
+                }
+            });
+            profileRepository.findByEmailIgnoreCase(email).ifPresent(other -> {
+                if (!other.getId().equals(profile.getId())) {
+                    throw new IllegalArgumentException("This email is already used by another account");
+                }
+            });
+            String currentEmail = profile.getEmail() == null ? "" : profile.getEmail().trim();
+            if (!email.equalsIgnoreCase(currentEmail)) {
+                profile.setEmail(email);
+                profile.setEmailVerified(false);
+                profile.setEmailVerifiedAt(null);
+                profile.setEmailVerificationCode(null);
+                profile.setEmailVerificationExpiresAt(null);
+                profile.setLastVerificationSentAt(null);
+            } else if (!email.equals(currentEmail)) {
+                profile.setEmail(email);
+            }
+        }
+
         if (request.getMobileNumber() != null) {
             String mobile = request.getMobileNumber().trim();
             if (mobile.isEmpty()) throw new IllegalArgumentException("Mobile number cannot be empty");
@@ -197,7 +334,11 @@ public class ProfileService {
         return t.isEmpty() ? null : t;
     }
 
-    private MyProfileResponse toResponse(Profile profile) {
+    public MyProfileResponse toResponse(Profile profile) {
+        return toResponse(profile, eligibilityService.countMatchesPlayed(profile.getId(), null));
+    }
+
+    public MyProfileResponse toResponse(Profile profile, int matchesPlayed) {
         Player player = profile.getPlayerId() == null
                 ? null
                 : playerRepository.findById(profile.getPlayerId()).orElse(null);
@@ -227,6 +368,8 @@ public class ProfileService {
                 .organizerRequestStatus(profile.getOrganizerRequestStatus())
                 .organizerRequestReason(profile.getOrganizerRequestReason())
                 .organizerRequestAt(profile.getOrganizerRequestAt() == null ? null : profile.getOrganizerRequestAt().toString())
+                .emailVerified(profile.isEmailVerified())
+                .matchesPlayed(matchesPlayed)
                 .build();
     }
 

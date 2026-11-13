@@ -86,7 +86,7 @@ export default function Stats() {
       <section className="min-h-[100vh] py-12 bg-background/80">
         <div className="container my-12 mx-auto px-6 max-w-4xl">
           <motion.h1
-            className="text-4xl md:text-5xl font-extrabold text-foreground mb-2"
+            className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -100,7 +100,7 @@ export default function Stats() {
           {!error && !data && <SectionSpinner label="Loading your stats…" />}
 
           {data && data.overall.matches === 0 && (
-            <div className="bg-card/80 rounded-3xl p-8 text-center shadow-2xl">
+            <div className="bg-card/80 rounded-3xl p-5 sm:p-8 text-center shadow-2xl">
               <p className="font-semibold text-foreground mb-1">No matches yet</p>
               <p className="text-sm text-foreground/70">
                 Your stats appear here once you are in a team's playing XI and the match is scored.
